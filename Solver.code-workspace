@@ -89,6 +89,7 @@
 			"any": "cpp",
 			"forward_list": "cpp",
 			"valarray": "cpp"
-		}
+		},
+		"gerrit.gitRepo": "/home/GHo/Documents/Code/NebulOuS/Solvers"
 	}
 }
