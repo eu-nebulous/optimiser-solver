@@ -36,6 +36,9 @@ License: MPL2.0 (https://www.mozilla.org/en-US/MPL/2.0/)
 // Standard headers
 
 #include <string_view>                          // Constant strings
+#include <string>                               // Normal strings
+#include <unordered_map>                        // To store metric-value maps
+#include <concepts>                             // To test template parameters
 
 // Other packages
 
@@ -58,14 +61,13 @@ namespace NebulOuS
  Solver Actor
 
 ==============================================================================*/
-//
 
 class Solver
 : virtual public Theron::Actor,
   virtual public Theron::StandardFallbackHandler
 {
 
-private:
+public:
 
   // --------------------------------------------------------------------------
   // Application Execution Context
@@ -103,8 +105,178 @@ private:
 
   static constexpr std::string_view ExecutionContext = "ExecutionContext";
 
+  // To ensure that the execution context is correctly provided by the senders
+  // The expected metric value structure is defined as a type based on the 
+  // standard unsorted map based on a JSON value object since this can hold 
+  // various value types.
 
+  using MetricValueType = std::unordered_map< std::string, JSON >;
+
+  // The identification type for the application execution context is defined
+  // so that other classes may use it, but also so that it can be easily 
+  // changed if needed. It is assumed that the type must have a hash function
+  // so that the type can be used in ordered data structures.
+
+  using ContextIdentifierType = std::string;
+
+  // The same goes for the time point type. This is defined as the number of 
+  // microseconds since the POSIX time epoch (1 January 1970) and stored as a
+  // long integral value.
+
+  using TimePointType = unsigned long long;
+
+  // The message is a simple JSON object where the various fields of the 
+  // message struct are set by the constructor to ensure that all fields are
+  // given when the message is constructed.
+
+  class ApplicationExecutionContext
+  : public Theron::AMQ::JSONMessage
+  {
+  public:
+
+    static constexpr 
+    std::string_view MessageIdentifier = "Solver::ApplicationExecutionContext";
+
+    ApplicationExecutionContext( const ContextIdentifierType & TheIdentifier, 
+                                 const TimePointType MicroSecondTimePoint,
+                                 const std::string ObjectiveFunctionID,
+                                 const MetricValueType & TheContext )
+    : JSONMessage( MessageIdentifier.data(),
+    { { ContextIdentifier.data(), TheIdentifier },
+      { TimeStamp.data(), MicroSecondTimePoint },
+      { ObjectiveFunctionLabel.data(), ObjectiveFunctionID },
+      { ExecutionContext.data(), TheContext } }
+     ) {}
+
+    ApplicationExecutionContext( const ApplicationExecutionContext & Other )
+    : JSONMessage( Other )
+    {}
+
+    ApplicationExecutionContext() = delete;
+    virtual ~ApplicationExecutionContext() = default;
+  };
+
+  // The handler for this message is virtual as it where the real action will
+  // happen and the search for the optimal solution will hopefully lead to a
+  // feasible soltuion that can be returned to the sender of the applicaton 
+  // context.
+
+protected:
+
+  virtual void SolveProblem( const ApplicationExecutionContext & TheContext, 
+                             const Address TheRequester ) = 0;
+
+  // --------------------------------------------------------------------------
+  // Solution
+  // --------------------------------------------------------------------------
+  //
+  // When a solution is found to a given problem, the solver should return the 
+  // found optimal value for the given objective function, It should return 
+  // this value together with the values assigned to the feasible variables
+  // leading to this optimal objective value. Additionally, the message will 
+  // contain the time point for which this solution is valid, and the 
+  // application execution context as the optimal solution is conditioned 
+  // on this solution.
+  //
+  // Since the probelm being resolved can be multi-objective, the values of all
+  // objective values will be returned as a JSON map where the attributes are 
+  // the names of the objective functions in the optimisation problem, and the 
+  // values are the ones assigned by the optimiser. This JSON map object is 
+  // passed under the global attribute "ObjectiveValues"
+
+public:
+
+  using ObjectiveValuesType = MetricValueType;
+  static constexpr std::string_view ObjectiveValues = "ObjectiveValues";
+
+  class Solution
+  : public Theron::AMQ::JSONMessage
+  {
+  public:
+
+    static constexpr std::string_view MessageIdentifier = "Solver::Solution";
+
+    Solution( const ContextIdentifierType & TheIdentifier,
+              const TimePointType MicroSecondTimePoint,
+              const std::string ObjectiveFunctionID,
+              const ObjectiveValuesType & TheObjectiveValues,
+              const MetricValueType & TheContext )
+    : JSONMessage( MessageIdentifier.data() ,
+      { { ContextIdentifier.data(), TheIdentifier },
+        { TimeStamp.data(), MicroSecondTimePoint   },
+        { ObjectiveFunctionLabel.data(), ObjectiveFunctionID },
+        { ObjectiveValues.data(), TheObjectiveValues },
+        { ExecutionContext.data(), TheContext } } )
+      {}
+    
+    Solution() = delete;
+    virtual ~Solution() = default;
+  };
+
+  // --------------------------------------------------------------------------
+  // Optimisation problem definition
+  // --------------------------------------------------------------------------
+  //
+  // There are many ways the optimisation problem can be passed to the solver, 
+  // and it is therefore not possible to give an exact format for the message
+  // to define or update the optimisation problem. The message is basically 
+  // left as a JSON message and it will be up to the actual solver algorithm
+  // to implement this in a way appropriate for the algorithm. 
+
+  class OptimisationProblem
+  : public Theron::AMQ::JSONMessage
+  {
+  public:
+
+    static constexpr 
+    std::string_view MessageIdentifier = "Solver::OptimisationProblem";
+
+    OptimisationProblem( const JSON & TheProblem )
+    : JSONMessage( MessageIdentifier.data(), TheProblem )
+    {}
+
+    OptimisationProblem() = delete;
+    virtual ~OptimisationProblem() = default;
+  };
+
+  // The handler for this message must also be defined by the algorithm that
+  // implements the solver.
+
+  virtual void DefineProblem( const OptimisationProblem & TheProblem, 
+                              const Address TheOracle ) = 0;
+
+  // --------------------------------------------------------------------------
+  // Constructor and destructor
+  // --------------------------------------------------------------------------
+  //
+  // The constructor defines the message handlers so that the derived soler 
+  // classes will not need to deal with the Actor specific details, and to 
+  // ensure that the handlers are called when the Actor receives the various
+  // messages. The constructor requires an actor name as the only parameter.
+
+  Solver( const std::string & TheSolverName )
+  : Actor( TheSolverName ),
+    StandardFallbackHandler( Actor::GetAddress().AsString() )
+  {
+    RegisterHandler( this, &Solver::SolveProblem  );
+    RegisterHandler( this, &Solver::DefineProblem );
+  }
+  
+  Solver() = delete;
+  virtual ~Solver() = default;
 };
+
+/*==============================================================================
+
+ Solver concept
+
+==============================================================================*/
+//
+// A concept is defined to validate that solvers used inherits this standard 
+// base class and that they implement the virtual methods.
+
+template< class TheSolverType >
+concept SolverAlgorithm = std::derived_from< TheSolverType, Solver >;
 
 } // namespace NebulOuS
 #endif // NEBULOUS_SOLVER
