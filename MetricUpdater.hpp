@@ -62,30 +62,71 @@ using JSON = nlohmann::json;                    // Short form name space
 #include "Communication/AMQ/AMQEndpoint.hpp"     // AMQ endpoint
 #include "Communication/AMQ/AMQSessionLayer.hpp" // For topic subscriptions
 
+// NebulOuS files
+
+#include "Solver.hpp"                            // The generic solver base
+
 namespace NebulOuS 
 {
+/*==============================================================================
+
+ Basic interface definitions
+
+==============================================================================*/
+//
 // Definitions for the terminology to facilitate changing the lables of the 
 // various message labels without changing the code. The definitions are 
 // compile time constants and as such should not lead to any run-time overhead.
+// The JSON attribute names may be found under the "Predicted monitoring 
+// metrics" section on the Wiki page [1].
 
-constexpr std::string_view ValueLabel{ "metricValue" };
-constexpr std::string_view TimePoint { "predictionTime" };
+constexpr std::string_view ValueLabel = "metricValue";
+constexpr std::string_view TimePoint  = "predictionTime";
 
 // The topic used for receiving the message(s) defining the metrics of the 
 // application execution context as published by the Optimiser Controller is 
 // defined next.
 
-constexpr std::string_view MetricSubscriptions{ "ApplicationContext" };
+constexpr std::string_view MetricSubscriptions = "ApplicationContext";
 
 // The metric value messages will be published on different topics and to 
 // check if an inbound message is from a metric value topic, it is necessary 
 // to test against the base string for the metric value topics according to 
-// the Wiki-page at
-// https://openproject.nebulouscloud.eu/projects/nebulous-collaboration-hub/wiki/monitoringdata-interface
+// the Wiki-page [1]
 
-constexpr std::string_view MetricValueRootString{
-  "eu.nebulouscloud.monitoring.predicted"
-};
+constexpr std::string_view MetricValueRootString
+          = "eu.nebulouscloud.monitoring.predicted";
+
+// The SLO violation detector will publish a message when a reconfiguration is 
+// deamed necessary for a future time point called "Event type V" on the wiki 
+// page [3]. The event contains a probability for at least one of the SLOs 
+// being violated at the predicted time point. It is not clear if the assessment
+// is being made by the SLO violation detector at every new metric prediction,
+// or if this event is only signalled when the probability is above some 
+// internal threshold of the SLO violation detector. 
+//
+// The current implementation assumes that the latter is the case, and hence 
+// just receiving the message indicates that a new application configuration 
+// should be found given the application execution context as predicted by the 
+// metric values recorded by the Metric Updater.  Should this assumption be 
+// wrong, the probability must be compared with some  user set threshold for 
+// each message, and to cater for this the probability field will always be 
+// compared to a threshold, currently set to zero to ensure that every event 
+// message will trigger a reconfiguration.
+//
+// However, the Metric updater will get this message from the Optimiser 
+// Controller component only if an update must be made. The message must 
+// contain a unique identifier, a time point for the solution, and the objective
+// function to be maximised.
+
+constexpr std::string_view SLOIdentifier = "Identifier";
+constexpr std::string_view ObjectiveFunctionName = "ObjectiveFunction";
+
+// The messages from the Optimizer Controller will be sent on a topic that 
+// should follow some standard topic convention.
+
+constexpr std::string_view SLOViolationTopic 
+          = "eu.nebulouscloud.optimiser.slo.violation";
 
 /*==============================================================================
 
@@ -117,8 +158,6 @@ private:
   // they arrive as JSON values this avoids converting the values on input and
   // output. The metric optimisation name is just a string.
 
-private:
-
   class MetricValueRecord
   {
   public:
@@ -141,6 +180,26 @@ private:
   // the key so that values can quickly be updated when messages arrives.
 
   std::unordered_map< Theron::AMQ::TopicName, MetricValueRecord > MetricValues;
+
+  // The metric values should ideally be forecasted for the same future time
+  // point, but this may not be assured, and as such a zero-order hold is 
+  // assumed for all metric values. This means that the last value received 
+  // for a metric is taken to be valid until the next update. The implication 
+  // is that the whole vector of metric values is valid for the largest time 
+  // point of any of the predictions. Hence, the largest prediction time point 
+  // must be stored for being able to associate a time point of validity to 
+  // the retruned metric vector.
+
+  Solver::TimePointType ValidityTime;
+
+  // When an SLO violation message is received the current vector of metric 
+  // values should be sent as an application execution context (message) to the
+  // Solution Manager actor that will invoke a solver to find the optimal 
+  // configuration for this configuration. The Metric Updater must therefore 
+  // know the address of the Solution Manager, and this must be passed to 
+  // the constructor.
+
+  const Address TheSolutionManger;
 
   // --------------------------------------------------------------------------
   // JSON messages: Type by topic
@@ -189,7 +248,7 @@ private:
     TypeByTopic( const TypeByTopic & Other )
     : JSONMessage( Other.GetMessageIdentifier(), Other )
     {}
-    
+
     virtual ~TypeByTopic() = default;
   };
 
@@ -209,9 +268,14 @@ private:
   public:
 
     MetricTopic( void )
-    : TypeByTopic( MetricSubscriptions.data() )
+    : TypeByTopic( std::string( MetricSubscriptions ) )
     {}
 
+    MetricTopic( const MetricTopic & Other )
+    : TypeByTopic( Other )
+    {}
+
+    virtual ~MetricTopic() = default;
   };
 
   // The handler for this message will check each attribute value of the 
@@ -226,6 +290,10 @@ private:
   // Metric values
   // --------------------------------------------------------------------------
   //
+  // The metric value message is defined as a topic message where the message 
+  // identifier is the root of the metric value topic name string. This is 
+  // identical to a wildcard operation matching all topics whose name start
+  // with this string. 
   
   class MetricValueUpdate
   : public TypeByTopic
@@ -233,18 +301,70 @@ private:
   public:
 
     MetricValueUpdate( void )
-    : TypeByTopic( MetricValueRootString.data() )
+    : TypeByTopic( std::string( MetricValueRootString ) )
     {}
     
+    MetricValueUpdate( const MetricValueUpdate & Other )
+    : TypeByTopic( Other )
+    {}
+
+    virtual ~MetricValueUpdate() = default;
   };
 
-  // The handler function will check the sender address against the subscribed
-  // topics and if a match is found it will update the value of the metric. 
-  // if no subscribed metric corresponds to the received message, the message
-  // will just be discarded.
+  // The handler function will update the value of the subscribed metric  
+  // based on the given topic name. If there is no such metric known, then the
+  // message will just be discarded.
 
   void UpdateMetricValue( const MetricValueUpdate & TheMetricValue, 
                           const Address TheMetricTopic );
+
+  // --------------------------------------------------------------------------
+  // SLO violations
+  // --------------------------------------------------------------------------
+  //
+  // The SLO Violation detector publishes an event to indicate that at least 
+  // one of the constraints for the application deployment will be violated in 
+  // the predicted future, and that the search for a new solution should start.
+
+  class SLOViolation
+  : public TypeByTopic
+  {
+  public:
+
+    SLOViolation( void )
+    : TypeByTopic( std::string( SLOViolationTopic ) )
+    {}
+
+    SLOViolation( const SLOViolation & Other )
+    : TypeByTopic( Other )
+    {}
+
+    virtual ~SLOViolation() = default;
+  };
+
+  // The handler for this message will generate an Application Execution 
+  // Context message to the Solution Manager passing the values of all 
+  // the metrics currently kept by the Metric Updater. 
+
+  void SLOViolationHandler( const SLOViolation & SeverityMessage, 
+                            const Address TheSLOTopic );
+
+  // --------------------------------------------------------------------------
+  // Constructor and destructor
+  // --------------------------------------------------------------------------
+  //
+  // The constructor requires the name of the Metric Updater Actor, and the 
+  // actor address of the Solution Manager Actor. It registers the handlers
+  // for all the message types
+
+public:
+
+  MetricUpdater( const std::string UpdaterName, 
+                 const Address ManagerForSolutions );
+
+  // The destructor is just the default destructor
+  
+  virtual ~MetricUpdater() = default;
 
 };      // Class Metric Updater
 }       // Name space NebulOuS

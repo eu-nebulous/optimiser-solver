@@ -141,11 +141,11 @@ public:
                                  const TimePointType MicroSecondTimePoint,
                                  const std::string ObjectiveFunctionID,
                                  const MetricValueType & TheContext )
-    : JSONMessage( MessageIdentifier.data(),
-    { { ContextIdentifier.data(), TheIdentifier },
-      { TimeStamp.data(), MicroSecondTimePoint },
-      { ObjectiveFunctionLabel.data(), ObjectiveFunctionID },
-      { ExecutionContext.data(), TheContext } }
+    : JSONMessage( std::string( MessageIdentifier ),
+    { { std::string( ContextIdentifier ), TheIdentifier },
+      { std::string( TimeStamp ), MicroSecondTimePoint },
+      { std::string( ObjectiveFunctionLabel ), ObjectiveFunctionID },
+      { std::string( ExecutionContext ), TheContext } }
      ) {}
 
     ApplicationExecutionContext( const ApplicationExecutionContext & Other )
@@ -201,12 +201,12 @@ public:
               const std::string ObjectiveFunctionID,
               const ObjectiveValuesType & TheObjectiveValues,
               const MetricValueType & TheContext )
-    : JSONMessage( MessageIdentifier.data() ,
-      { { ContextIdentifier.data(), TheIdentifier },
-        { TimeStamp.data(), MicroSecondTimePoint   },
-        { ObjectiveFunctionLabel.data(), ObjectiveFunctionID },
-        { ObjectiveValues.data(), TheObjectiveValues },
-        { ExecutionContext.data(), TheContext } } )
+    : JSONMessage( std::string( MessageIdentifier ) ,
+      { { std::string( ContextIdentifier ), TheIdentifier },
+        { std::string( TimeStamp ), MicroSecondTimePoint   },
+        { std::string( ObjectiveFunctionLabel ), ObjectiveFunctionID },
+        { std::string( ObjectiveValues ) , TheObjectiveValues },
+        { std::string( ExecutionContext ), TheContext } } )
       {}
     
     Solution() = delete;
@@ -232,7 +232,7 @@ public:
     std::string_view MessageIdentifier = "Solver::OptimisationProblem";
 
     OptimisationProblem( const JSON & TheProblem )
-    : JSONMessage( MessageIdentifier.data(), TheProblem )
+    : JSONMessage( std::string( MessageIdentifier ), TheProblem )
     {}
 
     OptimisationProblem() = delete;

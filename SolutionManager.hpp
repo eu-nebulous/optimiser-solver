@@ -250,7 +250,7 @@ SolverManager( const std::string & TheActorName,
   SolverPool(), ActiveSolvers(), PassiveSolvers(),
   Contexts(), ContextExecutionQueue()
 {
-  // The solvers are created by the expanding the arguments for the solvers 
+  // The solvers are created by expanding the arguments for the solvers 
   // one by one creating new elements in the solver pool
 
   ( SolverPool.emplace_back( SolverArguments ), ... );
