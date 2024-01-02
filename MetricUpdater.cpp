@@ -101,6 +101,10 @@ void MetricUpdater::UpdateMetricValue(
   }
 }
 
+// --------------------------------------------------------------------------
+// SLO Violation Events
+// --------------------------------------------------------------------------
+//
 // When an SLO Violation is predicted a message is received from the SLO 
 // violation detector and this will trigger the definition of a new 
 // application execution context and a request to the Solution Manager to 
@@ -150,6 +154,10 @@ void MetricUpdater::SLOViolationHandler(
   ), TheSolutionManger );
 }
 
+// --------------------------------------------------------------------------
+// Constructor and destructor
+// --------------------------------------------------------------------------
+//
 // The constructor initialises the base classes and sets the validity time
 // to zero so that it will be initialised by the first metric values received.
 // The message handlers are registered, and the the updater will then subscribe
@@ -170,13 +178,42 @@ MetricUpdater::MetricUpdater( const std::string UpdaterName,
 
   Send( Theron::AMQ::NetworkLayer::TopicSubscription(
     Theron::AMQ::NetworkLayer::TopicSubscription::Action::Subscription,
-    std::string( MetricSubscriptions ) ), 
-    Theron::Network::GetAddress( Theron::Network::Layer::Session ) );
+    std::string( NebulOuS::MetricSubscriptions ) ), 
+    GetSessionLayerAddress() );
 
   Send( Theron::AMQ::NetworkLayer::TopicSubscription(
     Theron::AMQ::NetworkLayer::TopicSubscription::Action::Subscription,
-    std::string( SLOViolationTopic ) ), 
-    Theron::Network::GetAddress( Theron::Network::Layer::Session ) ); 
+    std::string( NebulOuS::SLOViolationTopic ) ), 
+    GetSessionLayerAddress() ); 
+}
+
+// The destructor is closing the established subscription if the network is 
+// still running. If this is called when the application is closing the network
+// connection should be stopped, and in that case all subscriptions will be 
+// automatically cancelled. 
+
+MetricUpdater::~MetricUpdater()
+{
+  if( HasNetwork() )
+  {
+    Send( Theron::AMQ::NetworkLayer::TopicSubscription(
+      Theron::AMQ::NetworkLayer::TopicSubscription::Action::CloseSubscription,
+      std::string( NebulOuS::MetricSubscriptions ) ), 
+      GetSessionLayerAddress() );
+
+    Send( Theron::AMQ::NetworkLayer::TopicSubscription(
+      Theron::AMQ::NetworkLayer::TopicSubscription::Action::CloseSubscription,
+      std::string( NebulOuS::SLOViolationTopic ) ), 
+      GetSessionLayerAddress() );  
+
+    std::ranges::for_each( std::views::keys( MetricValues ),
+    [this]( const Theron::AMQ::TopicName & TheMetricTopic ){
+      Send( Theron::AMQ::NetworkLayer::TopicSubscription(
+        Theron::AMQ::NetworkLayer::TopicSubscription::Action::CloseSubscription,
+        std::string( MetricValueRootString ) + TheMetricTopic ), 
+        GetSessionLayerAddress() );
+    });
+  }
 }
 
 } // End name space NebulOuS

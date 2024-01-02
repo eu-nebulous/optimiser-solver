@@ -95,7 +95,7 @@ class SolverManager
 
 private:
 
-  const Address SolutionReceiver;
+  const Theron::AMQ::TopicName SolutionReceiver;
 
   // --------------------------------------------------------------------------
   // Solver management

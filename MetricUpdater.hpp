@@ -95,7 +95,7 @@ constexpr std::string_view MetricSubscriptions = "ApplicationContext";
 // the Wiki-page [1]
 
 constexpr std::string_view MetricValueRootString
-          = "eu.nebulouscloud.monitoring.predicted";
+          = "eu.nebulouscloud.monitoring.predicted.";
 
 // The SLO violation detector will publish a message when a reconfiguration is 
 // deamed necessary for a future time point called "Event type V" on the wiki 
@@ -202,57 +202,6 @@ private:
   const Address TheSolutionManger;
 
   // --------------------------------------------------------------------------
-  // JSON messages: Type by topic
-  // --------------------------------------------------------------------------
-  //
-  // The JSON message initialiser assumes that the content_type field of 
-  // the message contains an unique label for the JSON message type to 
-  // cover the situation where an actor may subscribe to multiple different
-  // messages all encoded as JSON messages. However, for this actor the type 
-  // of the message will be decided by the topic on which the message is 
-  // received. It is therefore necessary to set the message content type equal 
-  // to the AMQ sender prior to decoding the AMQ message to the correct JSON
-  // object.
-  //
-  // The issue with the metric subscriptions is that the same type of message
-  // can come from any of the topics publishing metric values, and as such any 
-  // topic name not being from the metric subscription command topic or the 
-  // SLO Violation Event topic will be understood as a metric value update 
-  // event The initialiser will check if the sender (topic) starts with the 
-  // message identifier. This will allow the wildcard matching for metric 
-  // values as well as an exact match for topic whose reply to address 
-  // equals the message identifer.
-  
-  class TypeByTopic
-  : public Theron::AMQ::JSONMessage
-  {
-  protected:
-
-    virtual bool 
-    Initialize( const ProtocolPayload & ThePayload ) noexcept override
-    {
-      if( ThePayload->reply_to().starts_with( GetMessageIdentifier() ) )
-      {
-        ThePayload->content_type( GetMessageIdentifier() );
-        return JSONMessage::Initialize( ThePayload );
-      }
-      else return false;
-    }
-  
-  public:
-
-    TypeByTopic( const std::string & TopicIdentifier )
-    : JSONMessage( TopicIdentifier )
-    {}
-    
-    TypeByTopic( const TypeByTopic & Other )
-    : JSONMessage( Other.GetMessageIdentifier(), Other )
-    {}
-
-    virtual ~TypeByTopic() = default;
-  };
-
-  // --------------------------------------------------------------------------
   // Subscribing to metric prediction values
   // --------------------------------------------------------------------------
   //
@@ -263,16 +212,16 @@ private:
   // the value publisher.
 
   class MetricTopic
-  : public TypeByTopic
+  : public Theron::AMQ::JSONTopicMessage
   {
   public:
 
     MetricTopic( void )
-    : TypeByTopic( std::string( MetricSubscriptions ) )
+    : JSONTopicMessage( std::string( MetricSubscriptions ) )
     {}
 
     MetricTopic( const MetricTopic & Other )
-    : TypeByTopic( Other )
+    : JSONTopicMessage( Other )
     {}
 
     virtual ~MetricTopic() = default;
@@ -296,16 +245,16 @@ private:
   // with this string. 
   
   class MetricValueUpdate
-  : public TypeByTopic
+  : public Theron::AMQ::JSONWildcardMessage
   {
   public:
 
     MetricValueUpdate( void )
-    : TypeByTopic( std::string( MetricValueRootString ) )
+    : JSONWildcardMessage( std::string( MetricValueRootString ) )
     {}
     
     MetricValueUpdate( const MetricValueUpdate & Other )
-    : TypeByTopic( Other )
+    : JSONWildcardMessage( Other )
     {}
 
     virtual ~MetricValueUpdate() = default;
@@ -325,18 +274,24 @@ private:
   // The SLO Violation detector publishes an event to indicate that at least 
   // one of the constraints for the application deployment will be violated in 
   // the predicted future, and that the search for a new solution should start.
+  // This message is caught by the Optimisation Controller and republished 
+  // adding a unique event identifier enabling the Optimisation Controller to
+  // match the produced solution with the event and deploy the right 
+  // configuration.The message must also contain the name of the objective 
+  // function to maximise. This name must match the name in the optimisation
+  // model sent to the solver.
 
   class SLOViolation
-  : public TypeByTopic
+  : public Theron::AMQ::JSONTopicMessage
   {
   public:
 
     SLOViolation( void )
-    : TypeByTopic( std::string( SLOViolationTopic ) )
+    : JSONTopicMessage( std::string( SLOViolationTopic ) )
     {}
 
     SLOViolation( const SLOViolation & Other )
-    : TypeByTopic( Other )
+    : JSONTopicMessage( Other )
     {}
 
     virtual ~SLOViolation() = default;
@@ -362,9 +317,11 @@ public:
   MetricUpdater( const std::string UpdaterName, 
                  const Address ManagerForSolutions );
 
-  // The destructor is just the default destructor
+  // The destructor will unsubscribe from the control channels for the 
+  // message defining metrics, and the channel for receiving SLO violation
+  // events.
   
-  virtual ~MetricUpdater() = default;
+  virtual ~MetricUpdater();
 
 };      // Class Metric Updater
 }       // Name space NebulOuS

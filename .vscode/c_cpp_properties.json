@@ -1,0 +1,29 @@
+{
+    "configurations": [
+        {
+            "name": "Linux",
+            "includePath": [
+                "${default}",
+                "/home/GHo/Documents/Code/CxxOpts/include",
+                "/usr/include",
+                "/home/GHo/Documents/Code/Theron++",
+                "/home/GHo/Documents/Code/Theron++/Utility",
+                "/home/GHo/Documents/Code/Theron++/Communication",
+                "/home/GHo/Documents/Code/Theron++/Communication/AMQ",
+                "/opt/AMPL/amplapi/include",
+                "${workspaceFolder}/**"
+            ],
+            "defines": [],
+            "compilerArgs": [
+                "--std=c++23",
+                "-I/opt/AMPL/amplapi/include",
+                "-I/usr/include"
+            ],
+            "cStandard": "c23",
+            "cppStandard": "c++23",
+            "intelliSenseMode": "linux-gcc-x64",
+            "compilerPath": "/usr/bin/g++"
+        }
+    ],
+    "version": 4
+}

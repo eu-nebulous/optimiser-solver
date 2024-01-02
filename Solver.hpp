@@ -49,10 +49,14 @@ using JSON = nlohmann::json;                    // Short form name space
 
 #include "Actor.hpp"                            // Actor base class
 #include "Utility/StandardFallbackHandler.hpp"  // Exception unhanded messages
+#include "Communication/PolymorphicMessage.hpp" // The network message type
+#include "Communication/NetworkingActor.hpp"    // External communications
 
 // AMQ communication headers
 
 #include "Communication/AMQ/AMQjson.hpp"         // For JSON metric messages
+#include "Communication/AMQ/AMQEndpoint.hpp"     // Enabling AMQ communication
+#include "Communication/AMQ/AMQSessionLayer.hpp" // For topic subscriptions
 
 namespace NebulOuS
 {
@@ -64,7 +68,9 @@ namespace NebulOuS
 
 class Solver
 : virtual public Theron::Actor,
-  virtual public Theron::StandardFallbackHandler
+  virtual public Theron::StandardFallbackHandler,
+  virtual public Theron::NetworkingActor< 
+    typename Theron::AMQ::Message::PayloadType >
 {
 
 public:
@@ -127,10 +133,11 @@ public:
 
   // The message is a simple JSON object where the various fields of the 
   // message struct are set by the constructor to ensure that all fields are
-  // given when the message is constructed.
+  // given when the message is constructed. The message is a JSON Topic Message
+  // received on the topic with the same name as the message identifier.
 
   class ApplicationExecutionContext
-  : public Theron::AMQ::JSONMessage
+  : public Theron::AMQ::JSONTopicMessage
   {
   public:
 
@@ -141,7 +148,7 @@ public:
                                  const TimePointType MicroSecondTimePoint,
                                  const std::string ObjectiveFunctionID,
                                  const MetricValueType & TheContext )
-    : JSONMessage( std::string( MessageIdentifier ),
+    : JSONTopicMessage( std::string( MessageIdentifier ),
     { { std::string( ContextIdentifier ), TheIdentifier },
       { std::string( TimeStamp ), MicroSecondTimePoint },
       { std::string( ObjectiveFunctionLabel ), ObjectiveFunctionID },
@@ -149,10 +156,13 @@ public:
      ) {}
 
     ApplicationExecutionContext( const ApplicationExecutionContext & Other )
-    : JSONMessage( Other )
+    : JSONTopicMessage( Other )
     {}
 
-    ApplicationExecutionContext() = delete;
+    ApplicationExecutionContext()
+    : JSONTopicMessage( std::string( MessageIdentifier ) )
+    {}
+
     virtual ~ApplicationExecutionContext() = default;
   };
 
@@ -186,13 +196,16 @@ protected:
 
 public:
 
-  using ObjectiveValuesType = MetricValueType;
-  static constexpr std::string_view ObjectiveValues = "ObjectiveValues";
-
   class Solution
-  : public Theron::AMQ::JSONMessage
+  : public Theron::AMQ::JSONTopicMessage
   {
   public:
+
+    using ObjectiveValuesType = MetricValueType;
+    using VariableValuesType  = MetricValueType;
+
+    static constexpr std::string_view ObjectiveValues = "ObjectiveValues";
+    static constexpr std::string_view VariableValues  = "VariableValues";
 
     static constexpr std::string_view MessageIdentifier = "Solver::Solution";
 
@@ -200,16 +213,19 @@ public:
               const TimePointType MicroSecondTimePoint,
               const std::string ObjectiveFunctionID,
               const ObjectiveValuesType & TheObjectiveValues,
-              const MetricValueType & TheContext )
-    : JSONMessage( std::string( MessageIdentifier ) ,
+              const VariableValuesType & TheVariables )
+    : JSONTopicMessage( std::string( MessageIdentifier ) ,
       { { std::string( ContextIdentifier ), TheIdentifier },
         { std::string( TimeStamp ), MicroSecondTimePoint   },
         { std::string( ObjectiveFunctionLabel ), ObjectiveFunctionID },
         { std::string( ObjectiveValues ) , TheObjectiveValues },
-        { std::string( ExecutionContext ), TheContext } } )
+        { std::string( VariableValues ), TheVariables } } )
       {}
     
-    Solution() = delete;
+    Solution()
+    : JSONTopicMessage( std::string( MessageIdentifier ) )
+    {}
+
     virtual ~Solution() = default;
   };
 
@@ -224,7 +240,7 @@ public:
   // to implement this in a way appropriate for the algorithm. 
 
   class OptimisationProblem
-  : public Theron::AMQ::JSONMessage
+  : public Theron::AMQ::JSONTopicMessage
   {
   public:
 
@@ -232,10 +248,13 @@ public:
     std::string_view MessageIdentifier = "Solver::OptimisationProblem";
 
     OptimisationProblem( const JSON & TheProblem )
-    : JSONMessage( std::string( MessageIdentifier ), TheProblem )
+    : JSONTopicMessage( std::string( MessageIdentifier ), TheProblem )
     {}
 
-    OptimisationProblem() = delete;
+    OptimisationProblem()
+    : JSONTopicMessage( std::string( MessageIdentifier ) )
+    {}
+
     virtual ~OptimisationProblem() = default;
   };
 
@@ -249,21 +268,43 @@ public:
   // Constructor and destructor
   // --------------------------------------------------------------------------
   //
-  // The constructor defines the message handlers so that the derived soler 
+  // The constructor defines the message handlers so that the derived solver
   // classes will not need to deal with the Actor specific details, and to 
   // ensure that the handlers are called when the Actor receives the various
-  // messages. The constructor requires an actor name as the only parameter.
+  // messages. It should be noted that the problem definition can arrive from 
+  // a remote actor on a topic corresponding to the message indentifier name.
+  // However, no subscription will be made for application execution contexts 
+  // since these should be sorted and sent in order by the Solution Manager 
+  // actor, and external communication should go throug the Solution Manager.
+  //
+  // The constructor requires an actor name as the only parameter, and the 
+  // destructor unsubscribes from the topics previously subscribed to by 
+  // the constuctor.
 
   Solver( const std::string & TheSolverName )
   : Actor( TheSolverName ),
-    StandardFallbackHandler( Actor::GetAddress().AsString() )
+    StandardFallbackHandler( Actor::GetAddress().AsString() ),
+    NetworkingActor( Actor::GetAddress().AsString() )
   {
     RegisterHandler( this, &Solver::SolveProblem  );
     RegisterHandler( this, &Solver::DefineProblem );
+
+    Send( Theron::AMQ::NetworkLayer::TopicSubscription(
+      Theron::AMQ::NetworkLayer::TopicSubscription::Action::Subscription,
+      Theron::AMQ::TopicName( OptimisationProblem::MessageIdentifier )
+    ), GetSessionLayerAddress() );
   }
   
   Solver() = delete;
-  virtual ~Solver() = default;
+
+  virtual ~Solver()
+  {
+    if( HasNetwork() )
+      Send( Theron::AMQ::NetworkLayer::TopicSubscription(
+        Theron::AMQ::NetworkLayer::TopicSubscription::Action::CloseSubscription,
+        Theron::AMQ::TopicName( OptimisationProblem::MessageIdentifier )
+      ), GetSessionLayerAddress() );
+  }
 };
 
 /*==============================================================================
