@@ -151,7 +151,7 @@ void MetricUpdater::SLOViolationHandler(
     SeverityMessage[ NebulOuS::TimePoint ].get< Solver::TimePointType >(),
     SeverityMessage[ NebulOuS::ObjectiveFunctionName ],
     TheApplicationExecutionContext
-  ), TheSolutionManger );
+  ), TheSolverManager );
 }
 
 // --------------------------------------------------------------------------
@@ -166,11 +166,11 @@ void MetricUpdater::SLOViolationHandler(
 // to for their values, and the second for receiving the SLO violation message.
 
 MetricUpdater::MetricUpdater( const std::string UpdaterName, 
-                              const Address ManagerForSolutions )
+                              const Address ManagerOfSolvers )
 : Actor( UpdaterName ),
   StandardFallbackHandler( Actor::GetAddress().AsString() ),
   NetworkingActor( Actor::GetAddress().AsString() ),
-  MetricValues(), ValidityTime(0), TheSolutionManger( ManagerForSolutions )
+  MetricValues(), ValidityTime(0), TheSolverManager( ManagerOfSolvers )
 {
   RegisterHandler( this, &MetricUpdater::AddMetricSubscription );
   RegisterHandler( this, &MetricUpdater::UpdateMetricValue     );

@@ -1,5 +1,5 @@
 /*==============================================================================
-Solution Manager
+Solver Manager
 
 This class handles the Execution Context mssage containing a time stamp and a 
 set of variable value assignments.It manages a time sorted queue and dispatches
@@ -7,7 +7,7 @@ the first application execution context to the solver when the solver is ready.
 The solution returned for a given execution context will be published together 
 with the execution context and the maximal utility value found by the solver.
 
-The solver actor class is given as a template argument to the solution manager,
+The solver actor class is given as a template argument to the solver manager,
 and at least one solver actor is instantiated at start up. This to allow 
 multiple solvers to run in parallel should this be necessary to serve properly
 the queue of waiting application execution contexts. If there are multiple 
@@ -52,6 +52,8 @@ License: MPL2.0 (https://www.mozilla.org/en-US/MPL/2.0/)
 #include <sstream>                              // For nice error messages
 #include <stdexcept>                            // Standard exceptions
 #include <source_location>                      // Error location reporting
+#include <condition_variable>                   // Execution stop management
+#include <mutex>                                // Lock the condtion variable
 
 // Other packages
 
@@ -72,6 +74,7 @@ using JSON = nlohmann::json;                    // Short form name space
 
 // NebulOuS headers
 
+#include "ExecutionControl.hpp"                  // Shut down messages
 #include "Solver.hpp"                            // The basic solver class
 
 namespace NebulOuS
@@ -87,7 +90,8 @@ class SolverManager
 : virtual public Theron::Actor,
   virtual public Theron::StandardFallbackHandler,
   virtual public Theron::NetworkingActor< 
-    typename Theron::AMQ::Message::PayloadType >
+    typename Theron::AMQ::Message::PayloadType >,
+  virtual public ExecutionControl
 {
   // There is a topic name used to publish solutions found by the solvers. This 
   // topic is given to the constructor and kept as a constant during the class
@@ -103,8 +107,6 @@ private:
   //
   // The solution manager dispatches the application execution contexts as 
   // requests for solutions to a pool of solvers. 
-
-private:
 
   std::list< SolverType > SolverPool;
   std::unordered_set< Address > ActiveSolvers, PassiveSolvers;
@@ -161,137 +163,140 @@ private:
 
       ContextExecutionQueue.erase( ContextExecutionQueue.begin(), 
         ContextExecutionQueue.begin() + DispatchedContexts );
+    }
   }
-}
 
-// The handler function simply enqueues the received context, records its 
-// timesamp and dispatch as many contexts as possible to the solvers. Note
-// that the context identifiers must be unique and there is a logic error 
-// if there is already a context with the same identifier. Then an invalid
-// arguemtn exception will be thrown. This strategy should be reconsidered
-// if there will be multiple entities firing execution contexts. 
+  // The handler function simply enqueues the received context, records its 
+  // timesamp and dispatch as many contexts as possible to the solvers. Note
+  // that the context identifiers must be unique and there is a logic error 
+  // if there is already a context with the same identifier. Then an invalid
+  // arguemtn exception will be thrown. This strategy should be reconsidered
+  // if there will be multiple entities firing execution contexts. 
 
-void HandleApplicationExecutionContext( 
-  const Solver:: ApplicationExecutionContext & TheContext,
-  const Address TheRequester )
-{
-  auto [_, Success] = Contexts.try_emplace( 
-    TheContext[ Solver::ContextIdentifier.data() ], TheContext );
-
-  if( Success )
+  void HandleApplicationExecutionContext( 
+    const Solver:: ApplicationExecutionContext & TheContext,
+    const Address TheRequester )
   {
-    ContextExecutionQueue.emplace( 
-      TheContext[ Solver::TimeStamp.data() ],
-      TheContext[ Solver::ContextIdentifier.data() ] );
+    auto [_, Success] = Contexts.try_emplace( 
+      TheContext[ Solver::ContextIdentifier.data() ], TheContext );
 
+    if( Success )
+    {
+      ContextExecutionQueue.emplace( 
+        TheContext[ Solver::TimeStamp.data() ],
+        TheContext[ Solver::ContextIdentifier.data() ] );
+
+      DispatchToSolvers();
+    }
+    else
+    {
+      std::source_location Location = std::source_location::current();
+      std::ostringstream ErrorMessage;
+
+      ErrorMessage << "[" << Location.file_name() << " at line " 
+                  << Location.line()
+                  << "in function " << Location.function_name() <<"] " 
+                  << "An Application Execution Context with identifier "
+                  << TheContext[ Solver::ContextIdentifier.data() ]
+                  << " was received while there is already one with the same "
+                  << "identifer. The identifiers must be unique!";
+
+      throw std::invalid_argument( ErrorMessage.str() );
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // Solutions
+  // --------------------------------------------------------------------------
+  //
+  // When a solution is received from a solver, it will be dispatched to all
+  // entities subscribing to the solution topic, and the solver will be returned
+  // to the pool of passive solvers. The dispatch function will be called at the 
+  // end to ensure that the solver starts working on queued application execution
+  // contexts, if any.
+
+  void PublishSolution( const Solver::Solution & TheSolution, 
+                        const Addres TheSolver )
+  {
+    Send( TheSolution, SolutionReceiver );
+    PassiveSolvers.insert( ActiveSolvers.extract( TheSolver ) );
     DispatchToSolvers();
   }
-  else
-  {
-    std::source_location Location = std::source_location::current();
-    std::ostringstream ErrorMessage;
 
-    ErrorMessage << "[" << Location.file_name() << " at line " 
-                 << Location.line()
-                 << "in function " << Location.function_name() <<"] " 
-                 << "An Application Execution Context with identifier "
-                 << TheContext[ Solver::ContextIdentifier.data() ]
-                 << " was received while there is already one with the same "
-                 << "identifer. The identifiers must be unique!";
+  // --------------------------------------------------------------------------
+  // Constructor and destructor
+  // --------------------------------------------------------------------------
+  //
+  // The constructor takes the name of the Solution Mnager Actor, the name of 
+  // the topic where the solutions should be published, and the topic where the 
+  // application execution contexts will be published. If the latter is empty,
+  // the manager will not listen to any externally generated requests, only those
+  // being sent from the Metric Updater supposed to exist on the same Actor 
+  // system node as the manager.The final arguments to the constructor is a 
+  // set of arguments to the solver type in the order expected by the solver
+  // type and repeated for the number of (local) solvers that should be created.
+  //
+  // Currently this manager does not support dispatching configurations to
+  // remote solvers and collect responses from these. However, this can be 
+  // circumvented by creating a local "solver" transferring the requests to 
+  // a remote solvers and collecting results from the remote solver.
+
+public:
+
+  SolverManager( const std::string & TheActorName, 
+                const Theron::AMQ::TopicName & SolutionTopic,
+                const Theron::AMQ::TopicName & ContextPublisherTopic,
+                const auto & ...SolverArguments )
+  : Actor( TheActorName ),
+    StandardFallbackHandler( Actor::GetAddress().AsString() ),
+    NetworkingActor( Actor::GetAddress().AsString() ),
+    ExecutionControl( Actor::GetAddress().AsString() ),
+    SolutionReceiver( SolutionTopic ),
+    SolverPool(), ActiveSolvers(), PassiveSolvers(),
+    Contexts(), ContextExecutionQueue()
+  {
+    // The solvers are created by expanding the arguments for the solvers 
+    // one by one creating new elements in the solver pool
+
+    ( SolverPool.emplace_back( std::forward( SolverArguments ) ), ... );
+
+    // If the solvers were successfully created, their addresses are recorded as
+    // passive servers, and a publisher is made for the solution channel, and 
+    // optionally, a subscritpion is made for the alternative context publisher 
+    // topic. If the solvers could not be created, then an invalid argument 
+    // exception will be thrown.
+
+    if( !SolverPool.empty() )
+    {
+      std::ranges::transform( ServerPool, std::inserter( PassiveSolvers ),
+      [](const SolverType & TheSolver){ return TheSolver.GetAddress(); } );
+
+      Send( Theron::AMQ::NetworkLayer::TopicSubscription( 
+            Theron::AMQ::NetworkLayer::TopicSubscription::Action::Publisher, 
+            SolutionTopic ), GetSessionLayerAddress() );
+
+      if( !ContextPublisherTopic.empty() )
+        Send( Theron::AMQ::NetworkLayer::TopicSubscription( 
+              Theron::AMQ::NetworkLayer::TopicSubscription::Action::Subscription, 
+              ContextPublisherTopic ), GetSessionLayerAddress() );
+    }
+    else
+    {
+      std::source_location Location = std::source_location::current();
+      std::ostringstream ErrorMessage;
+
+      ErrorMessage << "[" << Location.file_name() << " at line " 
+                  << Location.line()
+                  << "in function " << Location.function_name() <<"] " 
+                  << "It was not possible to construct any solver of type "
+                  << boost::core::demangle( typeid( SolverType ).name() )
+                  << " from the given constructor argument types: ";
+
+    (( ErrorMessage << boost::core::demangle( typeid( SolverArguments ).name() ) << " " ), ... );
 
     throw std::invalid_argument( ErrorMessage.str() );
+    }
   }
-}
-
-// --------------------------------------------------------------------------
-// Solutions
-// --------------------------------------------------------------------------
-//
-// When a solution is received from a solver, it will be dispatched to all
-// entities subscribing to the solution topic, and the solver will be returned
-// to the pool of passive solvers. The dispatch function will be called at the 
-// end to ensure that the solver starts working on queued application execution
-// contexts, if any.
-
-void PublishSolution( const Solver::Solution & TheSolution, 
-                      const Addres TheSolver )
-{
-  Send( TheSolution, SolutionReceiver );
-  PassiveSolvers.insert( ActiveSolvers.extract( TheSolver ) );
-  DispatchToSolvers();
-}
-
-// --------------------------------------------------------------------------
-// Constructor and destructor
-// --------------------------------------------------------------------------
-//
-// The constructor takes the name of the Solution Mnager Actor, the name of 
-// the topic where the solutions should be published, and the topic where the 
-// application execution contexts will be published. If the latter is empty,
-// the manager will not listen to any externally generated requests, only those
-// being sent from the Metric Updater supposed to exist on the same Actor 
-// system node as the manager.The final arguments to the constructor is a 
-// set of arguments to the solver type in the order expected by the solver
-// type and repeated for the number of (local) solvers that should be created.
-//
-// Currently this manager does not support dispatching configurations to
-// remote solvers and collect responses from these. However, this can be 
-// circumvented by creating a local "solver" transferring the requests to 
-// a remote solvers and collecting results from the remote solver.
-
-SolverManager( const std::string & TheActorName, 
-               const Theron::AMQ::TopicName & SolutionTopic,
-               const Theron::AMQ::TopicName & ContextPublisherTopic,
-               const auto & ...SolverArguments )
-: Actor( TheActorName ),
-  StandardFallbackHandler( Actor::GetAddress().AsString() ),
-  NetworkingActor( Actor::GetAddress().AsString() ),
-  SolutionReceiver( SolutionTopic ),
-  SolverPool(), ActiveSolvers(), PassiveSolvers(),
-  Contexts(), ContextExecutionQueue()
-{
-  // The solvers are created by expanding the arguments for the solvers 
-  // one by one creating new elements in the solver pool
-
-  ( SolverPool.emplace_back( SolverArguments ), ... );
-
-  // If the solvers were successfully created, their addresses are recorded as
-  // passive servers, and a publisher is made for the solution channel, and 
-  // optionally, a subscritpion is made for the alternative context publisher 
-  // topic. If the solvers could not be created, then an invalid argument 
-  // exception will be thrown.
-
-  if( !SolverPool.empty() )
-  {
-    std::ranges::transform( ServerPool, std::inserter( PassiveSolvers ),
-    [](const SolverType & TheSolver){ return TheSolver.GetAddress(); } );
-
-    Send( Theron::AMQ::NetworkLayer::TopicSubscription( 
-          Theron::AMQ::NetworkLayer::TopicSubscription::Action::Publisher, 
-          SolutionTopic ), GetSessionLayerAddress() );
-
-    if( !ContextPublisherTopic.empty() )
-      Send( Theron::AMQ::NetworkLayer::TopicSubscription( 
-            Theron::AMQ::NetworkLayer::TopicSubscription::Action::Subscription, 
-            ContextPublisherTopic ), GetSessionLayerAddress() );
-  }
-  else
-  {
-    std::source_location Location = std::source_location::current();
-    std::ostringstream ErrorMessage;
-
-    ErrorMessage << "[" << Location.file_name() << " at line " 
-                 << Location.line()
-                 << "in function " << Location.function_name() <<"] " 
-                 << "It was not possible to construct any solver of type "
-                 << boost::core::demangle( typeid( SolverType ).name() )
-                 << " from the given constructor argument types: ";
-
-   (( ErrorMessage << boost::core::demangle( typeid( SolverArguments ).name() ) << " " ), ... );
-
-   throw std::invalid_argument( ErrorMessage.str() );
-  }
-}
 
 };
   

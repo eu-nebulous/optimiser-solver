@@ -196,10 +196,10 @@ private:
   // values should be sent as an application execution context (message) to the
   // Solution Manager actor that will invoke a solver to find the optimal 
   // configuration for this configuration. The Metric Updater must therefore 
-  // know the address of the Solution Manager, and this must be passed to 
+  // know the address of the Soler Manager, and this must be passed to 
   // the constructor.
 
-  const Address TheSolutionManger;
+  const Address TheSolverManager;
 
   // --------------------------------------------------------------------------
   // Subscribing to metric prediction values
@@ -315,7 +315,7 @@ private:
 public:
 
   MetricUpdater( const std::string UpdaterName, 
-                 const Address ManagerForSolutions );
+                 const Address ManagerOfSolvers );
 
   // The destructor will unsubscribe from the control channels for the 
   // message defining metrics, and the channel for receiving SLO violation
