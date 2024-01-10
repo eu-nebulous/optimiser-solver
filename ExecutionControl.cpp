@@ -89,6 +89,8 @@ ExecutionControl::ExecutionControl( const std::string & TheActorName )
   Send( StatusMessage( StatusMessage::State::Starting ), 
         Address( std::string( StatusTopic ) ) );
 
+<<<<<<< PATCH SET (21fe96 First release)
+=======
 }
 
 // The destructor simply closes the publisher if the network is still active
@@ -101,6 +103,7 @@ ExecutionControl::~ExecutionControl( void )
       Theron::AMQ::NetworkLayer::TopicSubscription::Action::ClosePublisher,
       std::string( StatusTopic )
     ), GetSessionLayerAddress() );
+>>>>>>> BASE      (719fa3 Add Dockerfile)
 }
 
 } // namespace NebulOuS
