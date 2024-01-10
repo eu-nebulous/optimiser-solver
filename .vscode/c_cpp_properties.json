@@ -3,19 +3,15 @@
         {
             "name": "Linux",
             "includePath": [
-                "/usr/lib/gcc/x86_64-redhat-linux/13/../../../../include/c++/13",
                 "/home/GHo/Documents/Code/CxxOpts/include",
                 "/home/GHo/Documents/Code/Theron++",
-                "/home/GHo/Documents/Code/Theron++/Utility",
-                "/home/GHo/Documents/Code/Theron++/Communication",
-                "/home/GHo/Documents/Code/Theron++/Communication/AMQ",
                 "/opt/AMPL/amplapi/include/ampl",
                 "${workspaceFolder}/**",
-                "/home/GHo/Documents/Code/Theron++"
+                "/usr/lib/gcc/x86_64-redhat-linux/13/../../../../include/c++/13"
             ],
             "defines": [],
             "cStandard": "c23",
-            "intelliSenseMode": "linux-gcc-x64",
+            "intelliSenseMode": "${default}",
             "compilerPath": "/usr/bin/g++",
             "compilerArgs": [
                 "-std=c++23",
@@ -28,12 +24,9 @@
             "configurationProvider": "ms-vscode.makefile-tools",
             "browse": {
                 "path": [
-                    "/usr/lib/gcc/x86_64-redhat-linux/13/../../../../include/c++/13",
                     "/home/GHo/Documents/Code/Theron++",
                     "/home/GHo/Documents/Code/CxxOpts/include",
-                    "/home/GHo/Documents/Code/Theron++/Utility",
-                    "/home/GHo/Documents/Code/Theron++/Communication",
-                    "/home/GHo/Documents/Code/Theron++/Examples"
+                    "/usr/lib/gcc/x86_64-redhat-linux/13/../../../../include/c++/13"
                 ],
                 "limitSymbolsToIncludedHeaders": false
             }

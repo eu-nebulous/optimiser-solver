@@ -97,11 +97,12 @@ class SolverManager
 {
   // There is a topic name used to publish solutions found by the solvers. This 
   // topic is given to the constructor and kept as a constant during the class
-  // execution.
+  // execution. The same goes for the topic on which application execution 
+  // contexts will arrive for processing.
 
 private:
 
-  const Theron::AMQ::TopicName SolutionReceiver;
+  const Theron::AMQ::TopicName SolutionReceiver, ContextTopic;
 
   // --------------------------------------------------------------------------
   // Solver management
@@ -259,6 +260,7 @@ public:
     NetworkingActor( Actor::GetAddress().AsString() ),
     ExecutionControl( Actor::GetAddress().AsString() ),
     SolutionReceiver( SolutionTopic ),
+    ContextTopic( ContextPublisherTopic ),
     SolverPool(), ActiveSolvers(), PassiveSolvers(),
     Contexts(), ContextExecutionQueue()
   {
@@ -319,6 +321,25 @@ public:
     (( ErrorMessage << boost::core::demangle( typeid( SolverArguments ).name() ) << " " ), ... );
 
     throw std::invalid_argument( ErrorMessage.str() );
+    }
+  }
+
+  // The destructor closes all the open topics if the network is still open 
+  // when the destructor is invoked.
+
+  virtual ~SolverManager( void )
+  {
+    if( HasNetwork() )
+    {
+      Send( Theron::AMQ::NetworkLayer::TopicSubscription(
+        Theron::AMQ::NetworkLayer::TopicSubscription::Action::ClosePublisher,
+        SolutionReceiver
+      ), GetSessionLayerAddress() );
+
+      Send( Theron::AMQ::NetworkLayer::TopicSubscription(
+        Theron::AMQ::NetworkLayer::TopicSubscription::Action::CloseSubscription,
+        ContextTopic
+      ), GetSessionLayerAddress() );
     }
   }
 

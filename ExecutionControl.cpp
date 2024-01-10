@@ -68,7 +68,7 @@ void ExecutionControl::StopMessageHandler( const StopMessage & Command,
 }
 
 // -----------------------------------------------------------------------------
-// Constructor
+// Constructor & destructor
 // -----------------------------------------------------------------------------
 // 
 // The constructor registers the stop message handler and sets up a publisher 
@@ -89,6 +89,18 @@ ExecutionControl::ExecutionControl( const std::string & TheActorName )
   Send( StatusMessage( StatusMessage::State::Starting ), 
         Address( std::string( StatusTopic ) ) );
 
+}
+
+// The destructor simply closes the publisher if the network is still active
+// when the actor closes.
+
+ExecutionControl::~ExecutionControl( void )
+{
+  if( HasNetwork() )
+    Send( Theron::AMQ::NetworkLayer::TopicSubscription(
+      Theron::AMQ::NetworkLayer::TopicSubscription::Action::ClosePublisher,
+      std::string( StatusTopic )
+    ), GetSessionLayerAddress() );
 }
 
 } // namespace NebulOuS

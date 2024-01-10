@@ -167,7 +167,7 @@ public:
   ExecutionControl( const std::string & TheActorName );
 
   ExecutionControl() = delete;
-  virtual ~ExecutionControl() = default;
+  virtual ~ExecutionControl();
 };
         
 }      // namespace NebulOuS 

@@ -132,7 +132,7 @@ SOLVER_OBJECTS = $(addprefix $(OBJECTS_DIR)/, $(SOLVER_SOURCE:.cpp=.o) )
 # component's objective file, they can be built by a general rule
 
 $(OBJECTS_DIR)/%.o : %.cpp
-	$(CXX) $(CXXFLAGS) -c $< -o $@ $(INCLUDE_DIRECTORIES)
+	$(CC) $(CXXFLAGS) -c $< -o $@ $(INCLUDE_DIRECTORIES)
 
 #------------------------------------------------------------------------------
 # Solver component
@@ -143,7 +143,7 @@ $(OBJECTS_DIR)/%.o : %.cpp
 # the object files or the solver actors.
 
 SolverComponent: $(SOLVER_OBJECTS) $(THERON)/Theron++.a
-	$(CXX) -o SolverComponent $(CXXFLAGS) $(SOLVER_OBJECTS) $(LDFLAGS)
+	$(CC) -o SolverComponent $(CXXFLAGS) $(SOLVER_OBJECTS) $(LDFLAGS)
 
 # There is also a standard target to clean the automatically generated build 
 # files

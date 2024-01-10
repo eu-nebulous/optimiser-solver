@@ -54,6 +54,17 @@ be extended with the AMPL execution file path, e.g.,
 
   export PATH=$PATH:/opt/AMPL
 
+The parameters to the application are used as described above, and typically the
+endpoint is set to some unique identifier of the application for which this 
+solver is used, e.g.,
+
+  ./SolverComponent --AMPLDir /opt/AMPL \
+  --Endpoint f81ee-b42a8-a13d56-e28ec9-2f5578 --ModelDir AMPLTest/
+
+Debugging after a coredump
+
+  coredumpctl debug SolverComponent
+
 Author and Copyright: Geir Horn, University of Oslo
 Contact: Geir.Horn@mn.uio.no
 License: MPL2.0 (https://www.mozilla.org/en-US/MPL/2.0/)
@@ -66,6 +77,7 @@ License: MPL2.0 (https://www.mozilla.org/en-US/MPL/2.0/)
 #include <sstream>          // To format error messages
 #include <stdexcept>        // standard exceptions
 #include <filesystem>       // Access to the file system
+#include <map>              // For extended AMQ properties
 
 // Theron++ headers
 
@@ -78,7 +90,9 @@ License: MPL2.0 (https://www.mozilla.org/en-US/MPL/2.0/)
 
 // AMQ protocol related headers
 
+#include "proton/symbol.hpp"                    // AMQ symbols
 #include "proton/connection_options.hpp"        // Options for the Broker
+#include "proton/message.hpp"                   // AMQ messages definitions
 #include "Communication/AMQ/AMQMessage.hpp"     // The AMQP messages
 #include "Communication/AMQ/AMQEndpoint.hpp"    // The AMP endpoint
 #include "Communication/AMQ/AMQjson.hpp"        // Transparent JSON-AMQP
@@ -127,6 +141,8 @@ int main( int NumberOfCLIOptions, char ** CLIOptionStrings )
         cxxopts::value<unsigned int>()->default_value("5672") )
     ("S,Solver", "Solver to use, devault Couenne",
         cxxopts::value<std::string>()->default_value("couenne") )
+    ("T,Tenant", "Tenant identifier for messages",
+        cxxopts::value<std::string>()->default_value("TheTenant"))
     ("U,User", "The user name used for the AMQ Broker connection", 
         cxxopts::value<std::string>()->default_value("admin") )
     ("Pw,Password", "The password for the AMQ Broker connection", 
@@ -180,29 +196,51 @@ int main( int NumberOfCLIOptions, char ** CLIOptionStrings )
   // The AMQ communication is managed by the standard communication actors of 
   // the Theron++ Actor framewokr. Thus, it is just a matter of starting the 
   // endpoint actors with the given command line parameters.
-  //
-  // The network endpoint takes the endpoint name as the first argument, then 
-  // the URL for the broker and the port number. The user name and the password
-  // are defined in the AMQ Qpid Proton connection options, and the values are
-  // therefore set for the connection options.
+  
+  // There are certain properties defined for the NebulOuS communication 
+  // protocol where the endpoint name is taken as the application identifier
+  // and the tenant identifier and the protocol used. The same information 
+  // has to be given as different maps for the connection options and for
+  // the message properties.
+
+  std::map< proton::symbol, proton::value > NebulOuSProperties{
+    {"x-tenant-id", CLIValues["Tenant"].as< std::string >() },
+    {"x-application-id", CLIValues["Endpoint"].as< std::string >()},
+    {"x-protocol", "AMQP"}
+  };
+
+  proton::message::property_map MessageProperties{
+    {"x-tenant-id", CLIValues["Tenant"].as< std::string >() },
+    {"x-application-id", CLIValues["Endpoint"].as< std::string >()},
+    {"x-protocol", "AMQP"}
+  };
+
+  // The user name and the password are defined in the AMQ Qpid Proton 
+  // connection options, and the values are therefore set for the connection 
+  // options.
 
   proton::connection_options AMQOptions;
 
   AMQOptions.user( CLIValues["User"].as< std::string >() );
   AMQOptions.password( CLIValues["Password"].as< std::string >() );
-  
-  // Then the network endpoint cna be constructed using the default names for
-  // the various network endpoint servers in order to pass the defined 
-  // connection options.
+  AMQOptions.properties( NebulOuSProperties );
+
+  // The network endpoint takes the endpoint name as the first argument, then 
+  // the URL for the broker and the port number. Then the network endpoint can
+  // be constructed using the default names for the Session Layer and the 
+  // Presentation layer servers, but calling the endpoint for "Solver" to make
+  // it more visible at the AMQ broker listing of subscribers. The endpoint 
+  // will be a unique application identifier. The server names are followed
+  // by the defined connection options and the message options.
 
   Theron::AMQ::NetworkEndpoint AMQNetWork( 
     CLIValues["Endpoint"].as< std::string >(), 
     CLIValues["Broker"].as< std::string >(),
     CLIValues["Port"].as< unsigned int >(),
-    Theron::AMQ::Network::NetworkLayerLabel,
+    "Solver",
     Theron::AMQ::Network::SessionLayerLabel,
     Theron::AMQ::Network::PresentationLayerLabel,
-    AMQOptions
+    AMQOptions, MessageProperties
   );
 
   // --------------------------------------------------------------------------

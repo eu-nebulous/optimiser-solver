@@ -18,6 +18,7 @@ License: MPL2.0 (https://www.mozilla.org/en-US/MPL/2.0/)
 #include <ranges>                                  // Container ranges
 #include <algorithm>                               // Algorithms
 
+#include "Utility/ConsolePrint.hpp"                // For logging
 #include "Communication/AMQ/AMQEndpoint.hpp"       // For Topic subscriptions
 
 #include "MetricUpdater.hpp"
@@ -41,36 +42,34 @@ namespace NebulOuS
 void MetricUpdater::AddMetricSubscription( const MetricTopic & TheMetrics,
                                            const Address OptimiserController )
 {
-    if( TheMetrics.is_object() && 
-        TheMetrics.at( NebulOuS::MetricList ).is_object() )
-      {
-        JSON MetricList = TheMetrics.at( NebulOuS::MetricList );
-
-        for( const JSON MetricDefinition : MetricList.items() )      
-        {
-          auto [ MetricRecord, NewMetric ] = MetricValues.try_emplace( 
-                MetricDefinition.at( NebulOuS::MetricName ), JSON() );
-
-          if( NewMetric )
-            Send( Theron::AMQ::NetworkLayer::TopicSubscription( 
-                  Theron::AMQ::NetworkLayer::TopicSubscription::Action::Subscription,
-                  MetricRecord->first ), 
-                  Theron::AMQ::Network::GetAddress( Theron::Network::Layer::Session) );
-        }
-      }
-    else
+  if( TheMetrics.is_object() && 
+      TheMetrics.at( NebulOuS::MetricList ).is_array() )
+  {
+    for (auto & MetricRecord : TheMetrics.at( NebulOuS::MetricList ) )
     {
-      std::source_location Location = std::source_location::current();
-      std::ostringstream ErrorMessage;
+      auto [ MetricRecordPointer, NewMetric ] = MetricValues.try_emplace( 
+             MetricRecord.at( NebulOuS::MetricName ), JSON() );
 
-      ErrorMessage << "[" << Location.file_name() << " at line " << Location.line() 
-                  << "in function " << Location.function_name() <<"] " 
-                  << "The message to define a new metric subscription is given as "
-                  << std::endl << TheMetrics.dump(2) << std::endl
-                  << "this is not as expected!";
-
-      throw std::invalid_argument( ErrorMessage.str() );
+      if( NewMetric )
+        Send( Theron::AMQ::NetworkLayer::TopicSubscription( 
+              Theron::AMQ::NetworkLayer::TopicSubscription::Action::Subscription,
+              std::string( MetricValueRootString ) + MetricRecordPointer->first ), 
+              Theron::AMQ::Network::GetAddress( Theron::Network::Layer::Session) );
     }
+  }
+  else
+  {
+    std::source_location Location = std::source_location::current();
+    std::ostringstream ErrorMessage;
+
+    ErrorMessage << "[" << Location.file_name() << " at line " << Location.line() 
+                << " in function " << Location.function_name() <<"] " 
+                << "The message to define a new metric subscription is given as "
+                << std::endl << TheMetrics.dump(2) << std::endl
+                << "this is not as expected!";
+
+    throw std::invalid_argument( ErrorMessage.str() );
+  }
 }
 
 // The metric update value is received whenever any of subscribed forecasters
@@ -102,9 +101,16 @@ void MetricUpdater::AddMetricSubscription( const MetricTopic & TheMetrics,
 void MetricUpdater::UpdateMetricValue( 
      const MetricValueUpdate & TheMetricValue, const Address TheMetricTopic)
 {
+  Theron::ConsoleOutput Output;
+
+  Output << "Metric topic: " << TheMetricTopic.AsString() << std::endl;
+
   Theron::AMQ::TopicName TheTopic 
           = TheMetricTopic.AsString().erase( 0, 
                                       NebulOuS::MetricValueRootString.size() );
+
+  Output << "The metric: " << TheTopic << " has new value "
+         << TheMetricValue[ NebulOuS::ValueLabel ] << std::endl;
         
   if( MetricValues.contains( TheTopic ) )
   {

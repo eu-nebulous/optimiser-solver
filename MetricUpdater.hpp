@@ -88,7 +88,7 @@ constexpr std::string_view TimePoint  = "predictionTime";
 // defined next.
 
 constexpr std::string_view MetricSubscriptions 
-          = "eu.nebulouscloud.monitoring.metric_lists";
+          = "eu.nebulouscloud.monitoring.metric_list";
 
 // The JSON message attribute for the list of metrics is another JSON object
 // stored under the following key, see the Event type III defined in 
@@ -210,6 +210,10 @@ private:
     MetricTopic( const MetricTopic & Other )
     : JSONTopicMessage( Other )
     {}
+
+    // MetricTopic( const JSONTopicMessage & Other )
+    // : JSONTopicMessage( Other )
+    // {}
 
     virtual ~MetricTopic() = default;
   };
