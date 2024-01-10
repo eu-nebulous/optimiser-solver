@@ -5,7 +5,7 @@
             "includePath": [
                 "/home/GHo/Documents/Code/CxxOpts/include",
                 "/home/GHo/Documents/Code/Theron++",
-                "/opt/AMPL/amplapi/include/ampl",
+                "/opt/AMPL/amplapi/include/",
                 "${workspaceFolder}/**",
                 "/usr/lib/gcc/x86_64-redhat-linux/13/../../../../include/c++/13"
             ],
@@ -17,7 +17,7 @@
                 "-std=c++23",
                 "-I/home/GHo/Documents/Code/Theron++",
                 "-I/home/GHo/Documents/Code/CxxOpts/include",
-                "-I/opt/AMPL/amplapi/include/ampl"
+                "-I/opt/AMPL/amplapi/include/"
             ],
             "cppStandard": "c++23",
             "mergeConfigurations": false,
@@ -26,6 +26,7 @@
                 "path": [
                     "/home/GHo/Documents/Code/Theron++",
                     "/home/GHo/Documents/Code/CxxOpts/include",
+                    "/opt/AMPL/amplapi/include/",
                     "/usr/lib/gcc/x86_64-redhat-linux/13/../../../../include/c++/13"
                 ],
                 "limitSymbolsToIncludedHeaders": false

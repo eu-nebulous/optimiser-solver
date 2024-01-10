@@ -98,7 +98,7 @@ void AMPLSolver::DefineProblem(const Solver::OptimisationProblem & TheProblem,
   Output << "AMPL Solver received the AMPL problem: " << TheProblem.dump(2)
          << std::endl;
 
-  ProblemDefinition.read( SaveFile( TheProblem ) );
+  //ProblemDefinition.read( SaveFile( TheProblem ) );
   Output << "Problem loaded!" << std::endl;
 }
 
