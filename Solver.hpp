@@ -141,8 +141,8 @@ public:
   {
   public:
 
-    static constexpr 
-    std::string_view MessageIdentifier = "Solver::ApplicationExecutionContext";
+    static constexpr std::string_view MessageIdentifier 
+                     = "eu.nebulouscloud.optimiser.solver.context";
 
     ApplicationExecutionContext( const ContextIdentifierType & TheIdentifier, 
                                  const TimePointType MicroSecondTimePoint,
@@ -207,7 +207,8 @@ public:
     static constexpr std::string_view ObjectiveValues = "ObjectiveValues";
     static constexpr std::string_view VariableValues  = "VariableValues";
 
-    static constexpr std::string_view MessageIdentifier = "Solver::Solution";
+    static constexpr std::string_view MessageIdentifier 
+                     = "eu.nebulouscloud.optimiser.solver.solution";
 
     Solution( const ContextIdentifierType & TheIdentifier,
               const TimePointType MicroSecondTimePoint,
@@ -244,8 +245,8 @@ public:
   {
   public:
 
-    static constexpr 
-    std::string_view MessageIdentifier = "Solver::OptimisationProblem";
+    static constexpr std::string_view MessageIdentifier 
+                     = "eu.nebulouscloud.optimiser.solver.model";
 
     OptimisationProblem( const JSON & TheProblem )
     : JSONTopicMessage( std::string( MessageIdentifier ), TheProblem )

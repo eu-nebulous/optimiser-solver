@@ -98,8 +98,8 @@ CXXFLAGS = $(GENERAL_OPTIONS) $(INCLUDE_DIRECTORIES) $(DEPENDENCY_FLAGS) \
 # requires the full static path to the custom Theron library.
 
 CFLAGS = $(DEPENDENCY_FLAGS) $(OPTIMISATION_FLAG) $(GENERAL_OPTIONS)
-LDFLAGS = -fuse-ld=gold -ggdb -D_DEBUG -pthread -l$(THERON)/Theron++.a \
-		  -lqpid-proton-cpp -l$(AMPL_LIB)/libampl.so
+LDFLAGS = -fuse-ld=gold -ggdb -D_DEBUG -pthread $(THERON)/Theron++.a \
+		  -lqpid-proton-cpp $(AMPL_LIB)/libampl.so
 
 #------------------------------------------------------------------------------
 # Theron library

@@ -108,7 +108,10 @@ private:
   // The problem is received as an AMPL file in a message. However, the AMPL 
   // interface allows the loading of problem and data files on an existing 
   // AMPL object, and the AMPL API object is therefore reused when a new 
-  // problem file is received.
+  // problem file is received. The problem definition is protected so that 
+  // derived classes may solve the problem directly.
+
+protected:
 
   ampl::AMPL ProblemDefinition;
 
@@ -135,7 +138,8 @@ private:
 
 public:
 
-  static constexpr std::string_view DataFileTopic = "AMPL::DataFileUpdates";
+  static constexpr std::string_view DataFileTopic 
+                   = "eu.nebulouscloud.optimiser.solver.data";
 
   // The message defining the data file is a JSON topic message with the same
   // structure as the optimisation problem message: It contains only one 

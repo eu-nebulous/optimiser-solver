@@ -12,28 +12,33 @@
 # License: MPL2.0 (https://www.mozilla.org/en-US/MPL/2.0/)
 # ==============================================================================
 
-# Installing the development framework for the distribution
+# Installing the development framework for the distribution. Must be run 
+# as root on the machine - put 'sudo' in front if the build user is not root.
 
-dnf --assumeyes group 'Development Tools' 
-dnf --assumeyes install ccache qpid-proton-cpp* json-devel coin-or-Couenne
+dnf --assumeyes install gcc-c++ make git boost boost-devel ccache \
+qpid-proton-cpp* jsoncpp-devel coin-or-Couenne wget
 
 # Cloning the open source dependencies
 
-mkdir Externals
-cd Externals
 git clone https://github.com/jarro2783/cxxopts.git CxxOpts
 git clone https://github.com/GeirHo/TheronPlusPlus.git Theron++
-cd
+mkdir Theron++/Bin
+
+# Clone the solver component 
+
+git clone https://opendev.org/nebulous/optimiser-solver.git Solver
 
 # Installing the AMPL library
 
 wget https://portal.ampl.com/external/?url=\
-https://portal.ampl.com/dl/amplce/ampl.linux64.tgz
-tar --file=ampl.linux64.tgz --extract --directory=Externals/AMPL
-cp ampl.lic Externals/AMPL
+https://portal.ampl.com/dl/amplce/ampl.linux64.tgz -O ampl.linux64.tgz
+tar --file=ampl.linux64.tgz --extract
+mv ampl.linux-intel64 AMPL
+rm ampl.linux64.tgz
+#cp ampl.lic AMPL
 
 # Building the solver component
 
-make SolverComponent -e THERON=Externals/Theron++ \
-AMPL_INCLUDE=Externals/AMPL/amplapi/include AMPL_LIB=Externals/AMPL/amplapi/lib\
-CxxOpts_DIR=Externals/CxxOpts/include
+make -C Solver SolverComponent -e THERON=../Theron++ \
+AMPL_INCLUDE=../AMPL/amplapi/include AMPL_LIB=../AMPL/amplapi/lib \
+CxxOpts_DIR=../CxxOpts/include
