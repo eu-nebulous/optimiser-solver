@@ -15,6 +15,8 @@ License: MPL2.0 (https://www.mozilla.org/en-US/MPL/2.0/)
 #include <sstream>                                 // To format error messages
 #include <stdexcept>                               // standard exceptions
 #include <iterator>                                // Iterator support
+#include <ranges>                                  // Container ranges
+#include <algorithm>                               // Algorithms
 
 #include "Communication/AMQ/AMQEndpoint.hpp"       // For Topic subscriptions
 
@@ -114,44 +116,38 @@ void MetricUpdater::UpdateMetricValue(
 // based on the time point of the severity message. The Optimiser controller
 // must look for this identifier type on the solutions in order to decide 
 // which solutions to deploy.
+//
+// The message will be ignored if not all metric values have been received, 
+// and no error message indication will be given.
 
 void MetricUpdater::SLOViolationHandler( 
      const SLOViolation & SeverityMessage, const Address TheSLOTopic )
 {
   // The application execution context is constructed first 
   // as it represents the name and the current values of the recorded
-  // metrics. Note the construction has to be done conditionally based
-  // on whether the standard library containers supports the range based
-  // constructors defined for C++23
-
-  #ifdef __cpp_lib_containers_ranges
-  #pragma message("C++23: Range inserters available! Rewrite MetricUpdater.hpp!")
-
-  Solver::MetricValueType TheApplicationExecutionContext(
-    std::views::transform( MetricValues, [](const auto & MetricRecord){
-      return std::make_pair( MetricRecord.second.OptimisationName, 
-                             MetricRecord.second.Value );
-    }) );
-  #else
+  // metrics. 
 
   Solver::MetricValueType TheApplicationExecutionContext;
 
   for( const auto & [_, MetricRecord ] : MetricValues )
-    TheApplicationExecutionContext.emplace( MetricRecord.OptimisationName, 
-                                            MetricRecord.Value );
-
-  #endif
+    if( !MetricRecord.Value.is_null() )
+      TheApplicationExecutionContext.emplace( MetricRecord.OptimisationName,
+                                              MetricRecord.Value );
 
   // The application context can then be sent to the solution manager 
   // using the corresponding message, and the time stamp of the severity 
-  // message,
+  // message provided that the size of the execution context equals the 
+  // number of metric values. It will be different if any of the metric 
+  // values has not been updated, and in this case the application execution
+  // context is invalid and cannot be used for optimisation.
 
-  Send( Solver::ApplicationExecutionContext(
-    SeverityMessage[ NebulOuS::SLOIdentifier ],
-    SeverityMessage[ NebulOuS::TimePoint ].get< Solver::TimePointType >(),
-    SeverityMessage[ NebulOuS::ObjectiveFunctionName ],
-    TheApplicationExecutionContext
-  ), TheSolverManager );
+  if( TheApplicationExecutionContext.size() == MetricValues.size() )
+    Send( Solver::ApplicationExecutionContext(
+      SeverityMessage[ NebulOuS::SLOIdentifier ],
+      SeverityMessage[ NebulOuS::TimePoint ].get< Solver::TimePointType >(),
+      SeverityMessage[ NebulOuS::ObjectiveFunctionName ],
+      TheApplicationExecutionContext
+    ), TheSolverManager );
 }
 
 // --------------------------------------------------------------------------
