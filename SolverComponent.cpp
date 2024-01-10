@@ -67,7 +67,8 @@ License: MPL2.0 (https://www.mozilla.org/en-US/MPL/2.0/)
 #include "Communication/AMQ/AMQEndpoint.hpp"    // The AMP endpoint
 #include "Communication/AMQ/AMQjson.hpp"        // Transparent JSON-AMQP
 
-// The cxxopts command line options parser
+// The cxxopts command line options parser that can be cloned from 
+// https://github.com/jarro2783/cxxopts
 
 #include "cxxopts.hpp"
 

@@ -5,6 +5,23 @@
 # The NebulOuS solver consists of several interacting actors using the AMQ
 # interface of the Theron++ framework. 
 #
+# The following packages should be available on Fedora prior to compiling 
+# the file
+# 
+# 	ccache 				# for effcient C++ compilations
+# 	qpid-proton-cpp* 	# Qpid Proton Active Message Queue protocol API
+# 	json-devel			# Niels Lohmann's JSON library
+#	coin-or-Couenne		# The solver to be used by AMPL
+#
+# In addtition the problem is formuated using A Mathematical Programming 
+# Language (AMPL) and so it should be installed from
+# https://portal.ampl.com/user/ampl/request/amplce/trial/new
+#
+# There are source code dependencies that should be cloned to local disk 
+#
+#	Theron++			# https://github.com/GeirHo/TheronPlusPlus.git
+#	cxxopts				# https://github.com/jarro2783/cxxopts.git
+#
 # Author and Copyright: Geir Horn, University of Oslo
 # Contact: Geir.Horn@mn.uio.no
 # License: MPL2.0 (https://www.mozilla.org/en-US/MPL/2.0/)
@@ -14,25 +31,40 @@
 # Defining compiler and commands
 #
 
-CC = g++
+CC = ccache g++
 #CC = clang++
 RM = rm -f
 
+#------------------------------------------------------------------------------
+# Paths
+#------------------------------------------------------------------------------
+#
+# The default values of the paths are given here to be overridden by build 
+# definitions on the command line for creating the component container.
+#
 # Location of the Theron++ framework relative to this make file and the code
 
-THERON = /home/GHo/Documents/Code/Theron++
+THERON ?= /home/GHo/Documents/Code/Theron++
 
 # Location of the AMPL API directory
 
-AMPL_INCLUDE = /opt/AMPL/amplapi/include
+AMPL_INCLUDE ?= /opt/AMPL/amplapi/include
+
+# Location of the library directory
+
+AMPL_LIB ?= /opt/AMPL/amplapi/lib
 
 # The solver component uses the CxxOpts class for parsing the command line 
 # options since it is header only and lighter than the Options library of 
 # boost, which seems to have lost the most recent C++ features. The CxxOpts
 # library can be cloned from https://github.com/jarro2783/cxxopts
 
-CxxOpts_DIR = /home/GHo/Documents/Code/CxxOpts/include
+CxxOpts_DIR ?= /home/GHo/Documents/Code/CxxOpts/include
 
+#------------------------------------------------------------------------------
+# Options for the compiler and linker
+#------------------------------------------------------------------------------
+#
 # Optimisation -O3 is the highest level of optimisation and should be used 
 # with production code. -Og is the code optimising and offering debugging 
 # transparency and should be use while the code is under development
@@ -67,7 +99,7 @@ CXXFLAGS = $(GENERAL_OPTIONS) $(INCLUDE_DIRECTORIES) $(DEPENDENCY_FLAGS) \
 
 CFLAGS = $(DEPENDENCY_FLAGS) $(OPTIMISATION_FLAG) $(GENERAL_OPTIONS)
 LDFLAGS = -fuse-ld=gold -ggdb -D_DEBUG -pthread -l$(THERON)/Theron++.a \
-		  -lqpid-proton-cpp -l/opt/AMPL/amplapi/lib/libampl.so
+		  -lqpid-proton-cpp -l$(AMPL_LIB)/libampl.so
 
 #------------------------------------------------------------------------------
 # Theron library

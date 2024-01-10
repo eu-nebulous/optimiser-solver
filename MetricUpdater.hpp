@@ -87,7 +87,8 @@ constexpr std::string_view TimePoint  = "predictionTime";
 // application execution context as published by the Optimiser Controller is 
 // defined next.
 
-constexpr std::string_view MetricSubscriptions = "ApplicationContext";
+constexpr std::string_view MetricSubscriptions 
+          = "eu.nebulouscloud.optimiser.solver.metrics";
 
 // The metric value messages will be published on different topics and to 
 // check if an inbound message is from a metric value topic, it is necessary 
@@ -126,7 +127,7 @@ constexpr std::string_view ObjectiveFunctionName = "ObjectiveFunction";
 // should follow some standard topic convention.
 
 constexpr std::string_view SLOViolationTopic 
-          = "eu.nebulouscloud.optimiser.slo.violation";
+          = "eu.nebulouscloud.optimiser.solver.slo";
 
 /*==============================================================================
 
