@@ -16,6 +16,9 @@ to call the function to wait for termination.
 The threads calling the function to wait for termination will block until the 
 required message is received.
 
+The Agent is also involved with the general component status messages to be 
+sent to the Solver's status topic.
+
 Author and Copyright: Geir Horn, University of Oslo
 Contact: Geir.Horn@mn.uio.no
 License: MPL2.0 (https://www.mozilla.org/en-US/MPL/2.0/)
@@ -26,6 +29,10 @@ License: MPL2.0 (https://www.mozilla.org/en-US/MPL/2.0/)
 
 // Standard headers
 
+#include <string_view>                          // For constant strings
+#include <map>                                  // Standard maps
+#include <sstream>                              // Stream conversion
+#include <chrono>                               // For standard time points
 #include <condition_variable>                   // Execution stop management
 #include <mutex>                                // Lock the condtion variable
 
@@ -33,6 +40,12 @@ License: MPL2.0 (https://www.mozilla.org/en-US/MPL/2.0/)
 
 #include "Actor.hpp"                            // Actor base class
 #include "Utility/StandardFallbackHandler.hpp"  // Exception unhanded messages
+
+// AMQ communication
+
+#include "Communication/NetworkingActor.hpp"    // The networking actor
+#include "Communication/AMQ/AMQMessage.hpp"
+#include "Communication/AMQ/AMQjson.hpp"        // JSON messages to be sent
 
 namespace NebulOuS 
 {
@@ -45,7 +58,9 @@ namespace NebulOuS
 
 class ExecutionControl
 : virtual public Theron::Actor,
-  virtual public Theron::StandardFallbackHandler
+  virtual public Theron::StandardFallbackHandler,
+  virtual public Theron::NetworkingActor< 
+    typename Theron::AMQ::Message::PayloadType >
 {
   // The mechanism used for blocking other threads will be to make them wait 
   // for a condition variable until the message handler for the exit message
@@ -56,6 +71,57 @@ private:
   static bool                    Running;
   static std::mutex              TerminationLock;
   static std::condition_variable ReadyToTerminate;
+
+protected:
+
+  // There is a status message class that can be used to send the status to 
+  // other components.
+
+  class StatusMessage
+  : virtual public Theron::AMQ::JSONMessage
+  {
+  public:
+
+    enum class State
+    {
+      Starting,
+      Started,
+      Stopping,
+      Stopped
+    };
+
+  private:
+
+    std::string ToString( State TheSituation )
+    {
+      static const std::map< State, std::string > StateString {
+        {State::Starting, "starting"}, {State::Started, "started"}, 
+        {State::Stopping, "stopping"}, {State::Stopped, "stopped"}  };
+
+      return StateString.at( TheSituation );
+    }
+
+    std::string UTCNow( void )
+    {
+      std::ostringstream TimePoint;
+      TimePoint << std::chrono::system_clock::now();
+      return TimePoint.str();
+    }
+
+  public:
+
+    StatusMessage( State TheSituation, 
+                   std::string AdditionalInformation = std::string() )
+    : JSONMessage( std::string( StatusTopic ),
+                   { {"when", UTCNow() }, {"state", ToString( TheSituation ) },
+                     {"message", AdditionalInformation } } )
+    {}
+  };
+
+  // The status of the solver is communicated on the dedicated status topic
+
+  static constexpr std::string_view StatusTopic 
+                                     = "eu.nebulouscloud.solver.state";
 
 public:
 

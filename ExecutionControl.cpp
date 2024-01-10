@@ -11,6 +11,7 @@ License: MPL2.0 (https://www.mozilla.org/en-US/MPL/2.0/)
 
 #include "Actor.hpp"
 #include "Communication/NetworkEndpoint.hpp"
+#include "Communication/AMQ/AMQEndpoint.hpp"
 #include "ExecutionControl.hpp"
 
 namespace NebulOuS
@@ -56,6 +57,9 @@ void ExecutionControl::StopMessageHandler( const StopMessage & Command,
 {
   std::lock_guard< std::mutex > Lock( TerminationLock );
 
+  Send( StatusMessage( StatusMessage::State::Stopped ), 
+                       Address( std::string( StatusTopic ) ) );
+
   Send( Theron::Network::ShutDown(), 
         Theron::Network::GetAddress( Theron::Network::Layer::Session ) );
 
@@ -67,14 +71,24 @@ void ExecutionControl::StopMessageHandler( const StopMessage & Command,
 // Constructor
 // -----------------------------------------------------------------------------
 // 
-// The only action taken by the constructor is to register the handler for the
-// stop message.
+// The constructor registers the stop message handler and sets up a publisher 
+// for the status topic, and then post a message that the solver is starting.
 
 ExecutionControl::ExecutionControl( const std::string & TheActorName )
 : Actor( TheActorName ),
-  StandardFallbackHandler( Actor::GetAddress().AsString() )
+  StandardFallbackHandler( Actor::GetAddress().AsString() ),
+  NetworkingActor( Actor::GetAddress().AsString() )
 {
   RegisterHandler( this, &ExecutionControl::StopMessageHandler );
+
+  Send( Theron::AMQ::NetworkLayer::TopicSubscription(
+    Theron::AMQ::NetworkLayer::TopicSubscription::Action::Publisher,
+    std::string( StatusTopic )
+  ), GetSessionLayerAddress() );
+
+  Send( StatusMessage( StatusMessage::State::Starting ), 
+        Address( std::string( StatusTopic ) ) );
+
 }
 
 } // namespace NebulOuS

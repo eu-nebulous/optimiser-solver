@@ -299,6 +299,10 @@ public:
         Send( Theron::AMQ::NetworkLayer::TopicSubscription( 
               Theron::AMQ::NetworkLayer::TopicSubscription::Action::Subscription, 
               ContextPublisherTopic ), GetSessionLayerAddress() );
+
+      Send( ExecutionControl::StatusMessage(
+        ExecutionControl::StatusMessage::State::Started
+      ), Address( std::string( ExecutionControl::StatusTopic ) ) );
     }
     else
     {

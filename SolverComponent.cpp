@@ -17,6 +17,7 @@ The command line arguments that can be givne to the Solver Component are
 -M ir --ModelDir <directory> for model and data files
 -N or --name The AMQ identity of the solver (see below)
 -P or --port <n> the port to use on the AMQ broker URL
+-S or --Solver <label> The back-end solver used by AMPL
 -U or --user <user> the user to authenticate for the AMQ broker
 -Pw or --password <password> the AMQ broker password for the user
 -? or --Help prints a help message for the options
@@ -29,6 +30,7 @@ Default values:
 -M <temporary directory created by the OS>
 -N "NebulOuS::Solver"
 -P 5672
+-S couenne
 -U admin
 -Pw admin
 
@@ -37,6 +39,20 @@ solver component when connecting to the AMQ server. Typically the connection
 will be established as "name@endpoint" and so if there are several
 solver components running, the endpoint is the only way for the AMQ solvers to 
 distinguish the different solver component subscriptions.
+
+Notes on use:
+
+The path to the AMPL API shared libray must be in the LIB path environment 
+variable. For instance, the installation of AMPL on the author's machine is in
+/opt/AMPL and so the first thing to ensure is that the path to the API library
+directory is added to the link library path, e.g.,
+
+  export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/AMPL/amplapi/lib
+
+The AMPL directory also needs to be in the path variable, and the path must
+be extended with the AMPL execution file path, e.g.,
+
+  export PATH=$PATH:/opt/AMPL
 
 Author and Copyright: Geir Horn, University of Oslo
 Contact: Geir.Horn@mn.uio.no
@@ -100,20 +116,22 @@ int main( int NumberOfCLIOptions, char ** CLIOptionStrings )
   CLIOptions.add_options()
     ("A,AMPLDir", "The AMPL installation path",
         cxxopts::value<std::string>()->default_value("") )
-    ("B,broker", "The URL of the AMQ broker", 
+    ("B,Broker", "The URL of the AMQ broker", 
         cxxopts::value<std::string>()->default_value("localhost") )
-    ("E,endpoint", "The endpoint name", cxxopts::value<std::string>() )
+    ("E,Endpoint", "The endpoint name", cxxopts::value<std::string>() )
     ("M,ModelDir", "Directory to store the model and its data",
         cxxopts::value<std::string>()->default_value("") )
-    ("N,name", "The name of the Solver Component",
+    ("N,Name", "The name of the Solver Component",
         cxxopts::value<std::string>()->default_value("NebulOuS::Solver") )
-    ("P,port", "TCP port on  AMQ Broker", 
+    ("P,Port", "TCP port on  AMQ Broker", 
         cxxopts::value<unsigned int>()->default_value("5672") )
-    ("U,user", "The user name used for the AMQ Broker connection", 
+    ("S,Solver", "Solver to use, devault Couenne",
+        cxxopts::value<std::string>()->default_value("couenne") )
+    ("U,User", "The user name used for the AMQ Broker connection", 
         cxxopts::value<std::string>()->default_value("admin") )
-    ("Pw,password", "The password for the AMQ Broker connection", 
+    ("Pw,Password", "The password for the AMQ Broker connection", 
         cxxopts::value<std::string>()->default_value("admin") )
-    ("?,help", "Print help information");
+    ("h,help", "Print help information");
 
   CLIOptions.allow_unrecognised_options();
  
@@ -170,17 +188,17 @@ int main( int NumberOfCLIOptions, char ** CLIOptionStrings )
 
   proton::connection_options AMQOptions;
 
-  AMQOptions.user( CLIValues["user"].as< std::string >() );
-  AMQOptions.password( CLIValues["password"].as< std::string >() );
+  AMQOptions.user( CLIValues["User"].as< std::string >() );
+  AMQOptions.password( CLIValues["Password"].as< std::string >() );
   
   // Then the network endpoint cna be constructed using the default names for
   // the various network endpoint servers in order to pass the defined 
   // connection options.
 
   Theron::AMQ::NetworkEndpoint AMQNetWork( 
-    CLIValues["endpoint"].as< std::string >(), 
-    CLIValues["broker"].as< std::string >(),
-    CLIValues["port"].as< unsigned int >(),
+    CLIValues["Endpoint"].as< std::string >(), 
+    CLIValues["Broker"].as< std::string >(),
+    CLIValues["Port"].as< unsigned int >(),
     Theron::AMQ::Network::NetworkLayerLabel,
     Theron::AMQ::Network::SessionLayerLabel,
     Theron::AMQ::Network::PresentationLayerLabel,
@@ -203,11 +221,12 @@ int main( int NumberOfCLIOptions, char ** CLIOptionStrings )
   // the root solver name.
 
   NebulOuS::SolverManager< NebulOuS::AMPLSolver > 
-  WorkloadMabager( "WorkloadManager", 
+  WorkloadMabager( CLIValues["Name"].as<std::string>(), 
     std::string( NebulOuS::Solver::Solution::MessageIdentifier ), 
     std::string( NebulOuS::Solver::ApplicationExecutionContext::MessageIdentifier ),
     1, "AMPLSolver", 
-    ampl::Environment( TheAMPLDirectory.native() ), ModelDirectory );
+    ampl::Environment( TheAMPLDirectory.native() ), ModelDirectory, 
+    CLIValues["Solver"].as<std::string>() );
 
   NebulOuS::MetricUpdater 
   ContextMabager( "MetricUpdater", WorkloadMabager.GetAddress() );

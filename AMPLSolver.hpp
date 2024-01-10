@@ -223,23 +223,26 @@ public:
 
   explicit AMPLSolver( const std::string & TheActorName, 
                        const ampl::Environment & InstallationDirectory,
-                       const std::filesystem::path & ProblemPath );
+                       const std::filesystem::path & ProblemPath,
+                       std::string  TheSolverType );
 
   // If the path to the problem directory is omitted, it will be initialised to
   // a temporary directory.
 
   explicit AMPLSolver( const std::string & TheActorName, 
-                       const ampl::Environment & InstallationDirectory )
+                       const ampl::Environment & InstallationDirectory, 
+                       std::string TheSolverType )
   : AMPLSolver( TheActorName, InstallationDirectory, 
-                std::filesystem::temp_directory_path() )
+                std::filesystem::temp_directory_path(), TheSolverType )
   {}
 
   // If the AMPL installation environment is omitted, the installation directory
   // will be taken form the environment variables.
 
   explicit AMPLSolver( const std::string & TheActorName, 
-                       const std::filesystem::path & ProblemPath )
-  : AMPLSolver( TheActorName, ampl::Environment(), ProblemPath )
+                       const std::filesystem::path & ProblemPath, 
+                       std::string TheSolverType )
+  : AMPLSolver( TheActorName, ampl::Environment(), ProblemPath, TheSolverType )
   {}
 
   // Finally, it is just the standard constructor taking only the name of the
@@ -247,7 +250,7 @@ public:
 
   AMPLSolver( const std::string & TheActorName )
   : AMPLSolver( TheActorName, ampl::Environment(),  
-                std::filesystem::temp_directory_path() )
+                std::filesystem::temp_directory_path(), "couenne" )
   {}
 
   // The solver will just close the open connections for listening to data file

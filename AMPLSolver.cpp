@@ -15,6 +15,8 @@ License: MPL2.0 (https://www.mozilla.org/en-US/MPL/2.0/)
 #include <stdexcept>              // Standard exceptions
 #include <system_error>           // Error codes
 
+#include "Utility/ConsolePrint.hpp"
+
 #include "AMPLSolver.hpp"
 
 namespace NebulOuS
@@ -92,7 +94,12 @@ std::string AMPLSolver::SaveFile( const JSON & TheMessage,
 void AMPLSolver::DefineProblem(const Solver::OptimisationProblem & TheProblem,
                                const Address TheOracle)
 {
-    ProblemDefinition.read( SaveFile( TheProblem ) );
+  Theron::ConsoleOutput Output;
+  Output << "AMPL Solver received the AMPL problem: " << TheProblem.dump(2)
+         << std::endl;
+
+  ProblemDefinition.read( SaveFile( TheProblem ) );
+  Output << "Problem loaded!" << std::endl;
 }
 
 // The data file(s) corresponding to the current optimisation problem will be 
@@ -215,7 +222,8 @@ void AMPLSolver::SolveProblem(
 
 AMPLSolver::AMPLSolver( const std::string & TheActorName, 
                         const ampl::Environment & InstallationDirectory,
-                        const std::filesystem::path & ProblemPath )
+                        const std::filesystem::path & ProblemPath,
+                        const std::string TheSolverType )
 : Actor( TheActorName ),
   StandardFallbackHandler( Actor::GetAddress().AsString() ),
   NetworkingActor( Actor::GetAddress().AsString() ),
@@ -224,6 +232,8 @@ AMPLSolver::AMPLSolver( const std::string & TheActorName,
   ProblemDefinition( InstallationDirectory )
 {
   RegisterHandler( this, &AMPLSolver::DataFileUpdate );
+
+  ProblemDefinition.setOption( "solver", TheSolverType );
 
   Send( Theron::AMQ::NetworkLayer::TopicSubscription(
     Theron::AMQ::NetworkLayer::TopicSubscription::Action::Subscription,
