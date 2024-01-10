@@ -49,11 +49,13 @@ License: MPL2.0 (https://www.mozilla.org/en-US/MPL/2.0/)
 #include <list>                                 // Pool of local solvers
 #include <ranges>                               // Range based views
 #include <algorithm>                            // Standard algorithms
+#include <iterator>                             // For inserters
 #include <sstream>                              // For nice error messages
 #include <stdexcept>                            // Standard exceptions
 #include <source_location>                      // Error location reporting
 #include <condition_variable>                   // Execution stop management
 #include <mutex>                                // Lock the condtion variable
+#include <tuple>                                // For constructing solvers
 
 // Other packages
 
@@ -143,7 +145,7 @@ private:
     if( !PassiveSolvers.empty() && !ContextExecutionQueue.empty() )
     {
       for( const auto & [ SolverAddress, ContextElement ] : 
-          ranges::views::zip( PassiveSolvers, ContextExecutionQueue ) )
+          std::ranges::views::zip( PassiveSolvers, ContextExecutionQueue ) )
         Send( Contexts.at( ContextElement.second ), SolverAddress );
 
       // The number of contexts dispatched must equal the minimum of the 
@@ -156,13 +158,15 @@ private:
 
       std::ranges::move( 
         std::ranges::subrange( PassiveSolvers.begin(), 
-                               PassiveSolvers.begin() + DispatchedContexts ),
-        std::inserter( ActiveSolvers ) );
+                std::ranges::next( PassiveSolvers.begin(), DispatchedContexts, 
+                                   PassiveSolvers.end() ) ),
+        std::inserter( ActiveSolvers, ActiveSolvers.end() ) );
 
       // Then the dispatched context identifiers are removed from queue
 
       ContextExecutionQueue.erase( ContextExecutionQueue.begin(), 
-        ContextExecutionQueue.begin() + DispatchedContexts );
+        std::ranges::next( ContextExecutionQueue.begin(), DispatchedContexts,
+                           ContextExecutionQueue.end() ) );
     }
   }
 
@@ -216,7 +220,7 @@ private:
   // contexts, if any.
 
   void PublishSolution( const Solver::Solution & TheSolution, 
-                        const Addres TheSolver )
+                        const Address TheSolver )
   {
     Send( TheSolution, SolutionReceiver );
     PassiveSolvers.insert( ActiveSolvers.extract( TheSolver ) );
@@ -243,10 +247,13 @@ private:
 
 public:
 
+  template< typename ...SolverArgTypes >
   SolverManager( const std::string & TheActorName, 
-                const Theron::AMQ::TopicName & SolutionTopic,
-                const Theron::AMQ::TopicName & ContextPublisherTopic,
-                const auto & ...SolverArguments )
+                 const Theron::AMQ::TopicName & SolutionTopic,
+                 const Theron::AMQ::TopicName & ContextPublisherTopic,
+                 const unsigned int NumberOfSolvers,
+                 const std::string SolverRootName,
+                 SolverArgTypes && ...SolverArguments )
   : Actor( TheActorName ),
     StandardFallbackHandler( Actor::GetAddress().AsString() ),
     NetworkingActor( Actor::GetAddress().AsString() ),
@@ -256,10 +263,22 @@ public:
     Contexts(), ContextExecutionQueue()
   {
     // The solvers are created by expanding the arguments for the solvers 
-    // one by one creating new elements in the solver pool
+    // one by one creating new elements in the solver pool. The solvers 
+    // will be named with a sequence number from 1 and up added to the 
+    // root solver name, e.g., if the root name is "MySolver" the solvers
+    // will have names "MySolver_1", "MySolver_2",... and so forth. Since
+    // all solvers are of the same type they should take the same arguments
+    // and so the given arguments are just fowarded to each solver constructor.
 
-    ( SolverPool.emplace_back( std::forward( SolverArguments ) ), ... );
+    for( unsigned int i = 1; i <= NumberOfSolvers; i++ )
+    {
+      std::ostringstream TheSolverName;
 
+      TheSolverName << SolverRootName << "_" << i;
+      SolverPool.emplace_back( TheSolverName.str(), 
+                 std::forward< SolverArgTypes >(SolverArguments)... );
+    }
+    
     // If the solvers were successfully created, their addresses are recorded as
     // passive servers, and a publisher is made for the solution channel, and 
     // optionally, a subscritpion is made for the alternative context publisher 
@@ -268,8 +287,9 @@ public:
 
     if( !SolverPool.empty() )
     {
-      std::ranges::transform( ServerPool, std::inserter( PassiveSolvers ),
-      [](const SolverType & TheSolver){ return TheSolver.GetAddress(); } );
+      std::ranges::transform( SolverPool, 
+        std::inserter( PassiveSolvers, PassiveSolvers.end() ),
+        [](const SolverType & TheSolver){ return TheSolver.GetAddress(); } );
 
       Send( Theron::AMQ::NetworkLayer::TopicSubscription( 
             Theron::AMQ::NetworkLayer::TopicSubscription::Action::Publisher, 

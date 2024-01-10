@@ -46,16 +46,10 @@ License: MPL2.0 (https://www.mozilla.org/en-US/MPL/2.0/)
 // Standard headers
 
 #include <string>           // For standard strings
-// #include <memory>           // For smart pointers
 #include <source_location>  // Making informative error messages
 #include <sstream>          // To format error messages
 #include <stdexcept>        // standard exceptions
 #include <filesystem>       // Access to the file system
-// #include <initializer_list> // To unpack variable arguments
-// #include <concepts>         // To constrain types
-// #include <vector>           // To store subscribed topics
-// #include <thread>           // To sleep while waiting for termination
-// #include <chrono>           // To have a concept of fime
 
 // Theron++ headers
 
@@ -89,10 +83,9 @@ License: MPL2.0 (https://www.mozilla.org/en-US/MPL/2.0/)
 
 /*==============================================================================
 
- Main file
+ Main
 
 ==============================================================================*/
-//
 
 int main( int NumberOfCLIOptions, char ** CLIOptionStrings )
 {
@@ -201,12 +194,19 @@ int main( int NumberOfCLIOptions, char ** CLIOptionStrings )
   // a parameter to the constructor of the Metric Updater so the latter actor 
   // knows where to send application execution contexts whenever a new solution
   // is requested by the SLO Violation Detector through the Optimzer Controller.
+  // Then follows the number of solvers to use in the solver pool and the root 
+  // name of the solvers. This root name string will be extended with _n where n
+  // where n is a sequence number from 1.As all solvers are of the same type 
+  // given by the template parameter (here AMPLSolver), they are assumed to need
+  // the same set of constructor arguments and the constructor arguments follow
+  // the root solver name.
 
   NebulOuS::SolverManager< NebulOuS::AMPLSolver > 
   WorkloadMabager( "WorkloadManager", 
     std::string( NebulOuS::Solver::Solution::MessageIdentifier ), 
     std::string( NebulOuS::Solver::ApplicationExecutionContext::MessageIdentifier ),
-    "AMPLSolver", ampl::Environment( TheAMPLDirectory.native() ), ModelDirectory );
+    1, "AMPLSolver", 
+    ampl::Environment( TheAMPLDirectory.native() ), ModelDirectory );
 
   NebulOuS::MetricUpdater 
   ContextMabager( "MetricUpdater", WorkloadMabager.GetAddress() );

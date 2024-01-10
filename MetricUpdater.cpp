@@ -87,6 +87,12 @@ void MetricUpdater::AddMetricSubscription( const MetricTopic & TheMetrics,
 // The sender address will contain the metric topic, but this will contain the
 // generic metric prediction root string, and this string must be removed 
 // before the metric name can be updated. 
+//
+// Note that the map's [] operator cannot be used to look up the topic in the
+// current map because it assumes the implicit creation of non-existing keys,
+// which means that an empty metric value record should be constructed first
+// and then used. To modify the existing record, the 'at' function must be 
+// used.
 
 void MetricUpdater::UpdateMetricValue( 
      const MetricValueUpdate & TheMetricValue, const Address TheMetricTopic)
@@ -96,8 +102,8 @@ void MetricUpdater::UpdateMetricValue(
         
   if( MetricValues.contains( TheTopic ) )
   {
-    MetricValues[ TheTopic ].Value = TheMetricValue[ NebulOuS::ValueLabel ];
-
+    MetricValues.at( TheTopic ).Value = TheMetricValue[ NebulOuS::ValueLabel ];
+    
     ValidityTime = std::max( ValidityTime, 
       TheMetricValue[ NebulOuS::TimePoint ].get< Solver::TimePointType >() );
   }

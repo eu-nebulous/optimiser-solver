@@ -161,8 +161,11 @@ void AMPLSolver::SolveProblem(
   // objective functions as 'dropped'. Note that this is experimental code
   // as the multi-objective possibilities in AMPL are not well documented.
 
+  std::string 
+  OptimisationGoal = TheContext.at( Solver::ObjectiveFunctionLabel );
+
   for( auto TheObjective : ProblemDefinition.getObjectives() )
-    if( TheObjective.name() == TheContext.at( Solver::ObjectiveFunctionLabel ) )
+    if( TheObjective.name() == OptimisationGoal )
       TheObjective.restore();
     else
       TheObjective.drop();

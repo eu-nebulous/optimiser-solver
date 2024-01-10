@@ -164,7 +164,7 @@ private:
     const std::string OptimisationName;
     JSON              Value;
 
-    MetricValueRecord( const std::string & TheName, JSON InitialValue )
+    MetricValueRecord( const std::string & TheName, const JSON InitialValue )
     : OptimisationName( TheName ), Value( InitialValue )
     {}
 

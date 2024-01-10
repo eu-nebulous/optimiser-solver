@@ -22,6 +22,17 @@ RM = rm -f
 
 THERON = /home/GHo/Documents/Code/Theron++
 
+# Location of the AMPL API directory
+
+AMPL_INCLUDE = /opt/AMPL/amplapi/include
+
+# The solver component uses the CxxOpts class for parsing the command line 
+# options since it is header only and lighter than the Options library of 
+# boost, which seems to have lost the most recent C++ features. The CxxOpts
+# library can be cloned from https://github.com/jarro2783/cxxopts
+
+CxxOpts_DIR = /home/GHo/Documents/Code/CxxOpts/include
+
 # Optimisation -O3 is the highest level of optimisation and should be used 
 # with production code. -Og is the code optimising and offering debugging 
 # transparency and should be use while the code is under development
@@ -40,7 +51,8 @@ DEPENDENCY_FLAGS = -MMD -MP
 # Options 
 
 GENERAL_OPTIONS = -Wall -std=c++23 -ggdb -D_DEBUG
-INCLUDE_DIRECTORIES = -I. -I/usr/include -I$(THERON)
+INCLUDE_DIRECTORIES = -I. -I/usr/include -I$(THERON) -I$(AMPL_INCLUDE) \
+					  -I$(CxxOpts_DIR)
 
 CXXFLAGS = $(GENERAL_OPTIONS) $(INCLUDE_DIRECTORIES) $(DEPENDENCY_FLAGS) \
 		   $(OPTIMISATION_FLAG)
@@ -55,7 +67,7 @@ CXXFLAGS = $(GENERAL_OPTIONS) $(INCLUDE_DIRECTORIES) $(DEPENDENCY_FLAGS) \
 
 CFLAGS = $(DEPENDENCY_FLAGS) $(OPTIMISATION_FLAG) $(GENERAL_OPTIONS)
 LDFLAGS = -fuse-ld=gold -ggdb -D_DEBUG -pthread -l$(THERON)/Theron++.a \
-		  -lqpid-proton-cpp
+		  -lqpid-proton-cpp -l/opt/AMPL/amplapi/lib/libampl.so
 
 #------------------------------------------------------------------------------
 # Theron library
@@ -82,29 +94,34 @@ OBJECTS_DIR = Bin
 # Listing the actors' source files and expected object files
 
 SOLVER_SOURCE = $(wildcard *.cpp)
-SOLVER_OBJECTS = $(addprefix $(OBJECTS_DIR)/, $(SOLVER_SOURCE:.cpp=.o)
+SOLVER_OBJECTS = $(addprefix $(OBJECTS_DIR)/, $(SOLVER_SOURCE:.cpp=.o) )
 
 # Since all source files are in the same directory as the make file and the
 # component's objective file, they can be built by a general rule
 
 $(OBJECTS_DIR)/%.o : %.cpp
-	$(CXX) $(CXXFLAGS) $< -o $@ $(INCLUDE_DIRECTORIES)
+	$(CXX) $(CXXFLAGS) -c $< -o $@ $(INCLUDE_DIRECTORIES)
 
 #------------------------------------------------------------------------------
 # Solver component
 #------------------------------------------------------------------------------
 #
-# The solver component uses the CxxOpts class for parsing the command line 
-# options since it is header only and lighter than the Options library of 
-# boost, which seems to have lost the most recent C++ features. The CxxOpts
-# library can be cloned from https://github.com/jarro2783/cxxopts
-
-CxxOpts_DIR = /home/GHo/Documents/Code/CxxOpts/include
 
 # The only real target is to build the solver component whenever some of 
 # the object files or the solver actors.
 
-SolverComponent: SolverComponent.cpp $(SOLVER_OBJECTS) $(THERON)/Theron++.a
-	$(CXX) SolverComponent.cpp -o SolverComponent $(CXXFLAGS) \
-	-I$(CxxOpts_DIR) $(LDFLAGS)
+SolverComponent: $(SOLVER_OBJECTS) $(THERON)/Theron++.a
+	$(CXX) -o SolverComponent $(CXXFLAGS) $(SOLVER_OBJECTS) $(LDFLAGS)
 
+# There is also a standard target to clean the automatically generated build 
+# files
+
+clean:
+	$(RM) $(OBJECTS_DIR)/*.o $(OBJECTS_DIR)/*.d
+
+#------------------------------------------------------------------------------
+# Dependencies
+#------------------------------------------------------------------------------
+#
+
+-include $(SOLVER_OBJECTS:.o=.d)
