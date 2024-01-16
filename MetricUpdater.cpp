@@ -41,17 +41,22 @@ namespace NebulOuS
 void MetricUpdater::AddMetricSubscription( const MetricTopic & TheMetrics,
                                            const Address OptimiserController )
 {
-    if( TheMetrics.is_object() )
-      for( const auto & [MetricName, TopicName] : TheMetrics.items() )
+    if( TheMetrics.is_object() && 
+        TheMetrics.at( NebulOuS::MetricList ).is_object() )
       {
-        auto [ MetricRecord, NewMetric ] = MetricValues.try_emplace( 
-                                           TopicName, MetricName, JSON() );
+        JSON MetricList = TheMetrics.at( NebulOuS::MetricList );
 
-        if( NewMetric )
-          Send( Theron::AMQ::NetworkLayer::TopicSubscription( 
-                Theron::AMQ::NetworkLayer::TopicSubscription::Action::Subscription,
-                TopicName ), 
-                Theron::AMQ::Network::GetAddress( Theron::Network::Layer::Session) );
+        for( const JSON MetricDefinition : MetricList.items() )      
+        {
+          auto [ MetricRecord, NewMetric ] = MetricValues.try_emplace( 
+                MetricDefinition.at( NebulOuS::MetricName ), JSON() );
+
+          if( NewMetric )
+            Send( Theron::AMQ::NetworkLayer::TopicSubscription( 
+                  Theron::AMQ::NetworkLayer::TopicSubscription::Action::Subscription,
+                  MetricRecord->first ), 
+                  Theron::AMQ::Network::GetAddress( Theron::Network::Layer::Session) );
+        }
       }
     else
     {
@@ -62,7 +67,7 @@ void MetricUpdater::AddMetricSubscription( const MetricTopic & TheMetrics,
                   << "in function " << Location.function_name() <<"] " 
                   << "The message to define a new metric subscription is given as "
                   << std::endl << TheMetrics.dump(2) << std::endl
-                  << "this is not a JSON object!";
+                  << "this is not as expected!";
 
       throw std::invalid_argument( ErrorMessage.str() );
     }
@@ -98,11 +103,12 @@ void MetricUpdater::UpdateMetricValue(
      const MetricValueUpdate & TheMetricValue, const Address TheMetricTopic)
 {
   Theron::AMQ::TopicName TheTopic 
-          = TheMetricTopic.AsString().erase(0, MetricValueRootString.size() );
+          = TheMetricTopic.AsString().erase( 0, 
+                                      NebulOuS::MetricValueRootString.size() );
         
   if( MetricValues.contains( TheTopic ) )
   {
-    MetricValues.at( TheTopic ).Value = TheMetricValue[ NebulOuS::ValueLabel ];
+    MetricValues.at( TheTopic ) = TheMetricValue[ NebulOuS::ValueLabel ];
     
     ValidityTime = std::max( ValidityTime, 
       TheMetricValue[ NebulOuS::TimePoint ].get< Solver::TimePointType >() );
@@ -135,10 +141,9 @@ void MetricUpdater::SLOViolationHandler(
 
   Solver::MetricValueType TheApplicationExecutionContext;
 
-  for( const auto & [_, MetricRecord ] : MetricValues )
-    if( !MetricRecord.Value.is_null() )
-      TheApplicationExecutionContext.emplace( MetricRecord.OptimisationName,
-                                              MetricRecord.Value );
+  for( const auto & [ MetricName, MetricValue ] : MetricValues )
+    if( !MetricValue.is_null() )
+      TheApplicationExecutionContext.emplace( MetricName, MetricValue );
 
   // The application context can then be sent to the solution manager 
   // using the corresponding message, and the time stamp of the severity 

@@ -88,7 +88,15 @@ constexpr std::string_view TimePoint  = "predictionTime";
 // defined next.
 
 constexpr std::string_view MetricSubscriptions 
-          = "eu.nebulouscloud.optimiser.solver.metrics";
+          = "eu.nebulouscloud.monitoring.metric_lists";
+
+// The JSON message attribute for the list of metrics is another JSON object
+// stored under the following key, see the Event type III defined in 
+// https://158.39.75.54/projects/nebulous-collaboration-hub/wiki/slo-severity-based-violation-detector
+// where the name of the metric is defined under as sub-key.
+
+constexpr std::string_view MetricList = "metric_list";
+constexpr std::string_view MetricName = "name";
 
 // The metric value messages will be published on different topics and to 
 // check if an inbound message is from a metric value topic, it is necessary 
@@ -154,33 +162,11 @@ private:
   // --------------------------------------------------------------------------
   //
   // The metric values are stored essentially as a JSON values where the 
-  // attributes are the metric names and the values are JSON values because 
-  // they are polymorphic with respect to different variable types, and as 
-  // they arrive as JSON values this avoids converting the values on input and
-  // output. The metric optimisation name is just a string.
+  // attributes are the metric names and the values are JSON values. It is 
+  // assumed that same metric name is used both for the optimisation model 
+  // and for the metric topic.
 
-  class MetricValueRecord
-  {
-  public:
-    const std::string OptimisationName;
-    JSON              Value;
-
-    MetricValueRecord( const std::string & TheName, const JSON InitialValue )
-    : OptimisationName( TheName ), Value( InitialValue )
-    {}
-
-    MetricValueRecord( const MetricValueRecord & Other )
-    : OptimisationName( Other.OptimisationName ), Value( Other.Value )
-    {}
-
-    MetricValueRecord()  = delete;
-    ~MetricValueRecord() = default;
-  };
-
-  // This value record is used in the map where the subscribed topic name is 
-  // the key so that values can quickly be updated when messages arrives.
-
-  std::unordered_map< Theron::AMQ::TopicName, MetricValueRecord > MetricValues;
+  std::unordered_map< Theron::AMQ::TopicName, JSON > MetricValues;
 
   // The metric values should ideally be forecasted for the same future time
   // point, but this may not be assured, and as such a zero-order hold is 
