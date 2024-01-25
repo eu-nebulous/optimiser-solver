@@ -88,11 +88,7 @@ constexpr std::string_view TimePoint  = "predictionTime";
 // defined next.
 
 constexpr std::string_view MetricSubscriptions 
-<<<<<<< PATCH SET (21fe96 First release)
-          = "eu.nebulouscloud.monitoring.metric_lists";
-=======
           = "eu.nebulouscloud.monitoring.metric_list";
->>>>>>> BASE      (719fa3 Add Dockerfile)
 
 // The JSON message attribute for the list of metrics is another JSON object
 // stored under the following key, see the Event type III defined in 

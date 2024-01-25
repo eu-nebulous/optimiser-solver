@@ -141,13 +141,9 @@ int main( int NumberOfCLIOptions, char ** CLIOptionStrings )
         cxxopts::value<unsigned int>()->default_value("5672") )
     ("S,Solver", "Solver to use, devault Couenne",
         cxxopts::value<std::string>()->default_value("couenne") )
-<<<<<<< PATCH SET (21fe96 First release)
-    ("U,user", "The user name used for the AMQ Broker connection", 
-=======
     ("T,Tenant", "Tenant identifier for messages",
         cxxopts::value<std::string>()->default_value("TheTenant"))
     ("U,User", "The user name used for the AMQ Broker connection", 
->>>>>>> BASE      (719fa3 Add Dockerfile)
         cxxopts::value<std::string>()->default_value("admin") )
     ("Pw,Password", "The password for the AMQ Broker connection", 
         cxxopts::value<std::string>()->default_value("admin") )
