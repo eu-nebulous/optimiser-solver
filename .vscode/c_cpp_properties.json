@@ -7,7 +7,11 @@
                 "/home/GHo/Documents/Code/Theron++",
                 "/opt/AMPL/amplapi/include/",
                 "${workspaceFolder}/**",
+<<<<<<< PATCH SET (21fe96 First release)
+                "/home/GHo/Documents/Code/Theron++"
+=======
                 "/usr/lib/gcc/x86_64-redhat-linux/13/../../../../include/c++/13"
+>>>>>>> BASE      (719fa3 Add Dockerfile)
             ],
             "defines": [],
             "cStandard": "c23",

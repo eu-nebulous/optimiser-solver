@@ -42,19 +42,50 @@ namespace NebulOuS
 void MetricUpdater::AddMetricSubscription( const MetricTopic & TheMetrics,
                                            const Address OptimiserController )
 {
+<<<<<<< PATCH SET (21fe96 First release)
+    if( TheMetrics.is_object() && 
+        TheMetrics.at( NebulOuS::MetricList ).is_object() )
+      {
+        JSON MetricList = TheMetrics.at( NebulOuS::MetricList );
+
+        for( const JSON MetricDefinition : MetricList.items() )      
+        {
+          auto [ MetricRecord, NewMetric ] = MetricValues.try_emplace( 
+                MetricDefinition.at( NebulOuS::MetricName ), JSON() );
+
+          if( NewMetric )
+            Send( Theron::AMQ::NetworkLayer::TopicSubscription( 
+                  Theron::AMQ::NetworkLayer::TopicSubscription::Action::Subscription,
+                  MetricRecord->first ), 
+                  Theron::AMQ::Network::GetAddress( Theron::Network::Layer::Session) );
+        }
+      }
+    else
+=======
   if( TheMetrics.is_object() && 
       TheMetrics.at( NebulOuS::MetricList ).is_array() )
   {
     for (auto & MetricRecord : TheMetrics.at( NebulOuS::MetricList ) )
+>>>>>>> BASE      (719fa3 Add Dockerfile)
     {
       auto [ MetricRecordPointer, NewMetric ] = MetricValues.try_emplace( 
              MetricRecord.at( NebulOuS::MetricName ), JSON() );
 
+<<<<<<< PATCH SET (21fe96 First release)
+      ErrorMessage << "[" << Location.file_name() << " at line " << Location.line() 
+                  << "in function " << Location.function_name() <<"] " 
+                  << "The message to define a new metric subscription is given as "
+                  << std::endl << TheMetrics.dump(2) << std::endl
+                  << "this is not as expected!";
+
+      throw std::invalid_argument( ErrorMessage.str() );
+=======
       if( NewMetric )
         Send( Theron::AMQ::NetworkLayer::TopicSubscription( 
               Theron::AMQ::NetworkLayer::TopicSubscription::Action::Subscription,
               std::string( MetricValueRootString ) + MetricRecordPointer->first ), 
               Theron::AMQ::Network::GetAddress( Theron::Network::Layer::Session) );
+>>>>>>> BASE      (719fa3 Add Dockerfile)
     }
   }
   else
@@ -108,9 +139,12 @@ void MetricUpdater::UpdateMetricValue(
   Theron::AMQ::TopicName TheTopic 
           = TheMetricTopic.AsString().erase( 0, 
                                       NebulOuS::MetricValueRootString.size() );
+<<<<<<< PATCH SET (21fe96 First release)
+=======
 
   Output << "The metric: " << TheTopic << " has new value "
          << TheMetricValue[ NebulOuS::ValueLabel ] << std::endl;
+>>>>>>> BASE      (719fa3 Add Dockerfile)
         
   if( MetricValues.contains( TheTopic ) )
   {
