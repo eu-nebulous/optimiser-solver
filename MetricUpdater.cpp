@@ -156,14 +156,15 @@ void MetricUpdater::SLOViolationHandler(
   // message provided that the size of the execution context equals the 
   // number of metric values. It will be different if any of the metric 
   // values has not been updated, and in this case the application execution
-  // context is invalid and cannot be used for optimisation.
+  // context is invalid and cannot be used for optimisation and the 
+  // SLO violation event will just be ignored. Finally, the flag indicating
+  // that the corresponding solution found for this application execution 
+  // context should actually be enacted and deployed.
 
   if( TheApplicationExecutionContext.size() == MetricValues.size() )
     Send( Solver::ApplicationExecutionContext(
-      SeverityMessage[ NebulOuS::SLOIdentifier ],
-      SeverityMessage[ NebulOuS::TimePoint ].get< Solver::TimePointType >(),
-      SeverityMessage[ NebulOuS::ObjectiveFunctionName ],
-      TheApplicationExecutionContext
+      SeverityMessage.at( NebulOuS::TimePoint ).get< Solver::TimePointType >(),
+      TheApplicationExecutionContext, true
     ), TheSolverManager );
 }
 

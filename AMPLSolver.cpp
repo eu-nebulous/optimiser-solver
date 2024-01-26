@@ -32,23 +32,20 @@ std::string AMPLSolver::SaveFile( const JSON & TheMessage,
 {
   if( TheMessage.is_object() )
   {
-    // Writing the problem file based on the message content that should be 
-    // only a single key-value pair. If the file could not be opened, a run
-    // time exception is thrown. 
-
     std::string TheFileName 
-                = ProblemFileDirectory / TheMessage.begin().key();
+                = ProblemFileDirectory / TheMessage.at( AMPLSolver::FileName );
 
-    std::fstream ProblemFile( TheFileName, std::ios::out );
+    std::fstream ProblemFile( TheFileName, std::ios::out | std::ios::binary );
                         
     if( ProblemFile.is_open() )
     {
-      ProblemFile << TheMessage.begin().value();
+      ProblemFile << TheMessage.at( AMPLSolver::FileContent );
       ProblemFile.close();
       return TheFileName;
     }
     else
     {
+      std::source_location Location = std::source_location::current();
       std::ostringstream ErrorMessage;
 
       ErrorMessage << "[" << Location.file_name() << " at line " 
@@ -64,6 +61,7 @@ std::string AMPLSolver::SaveFile( const JSON & TheMessage,
   }
   else
   {
+    std::source_location Location = std::source_location::current();
     std::ostringstream ErrorMessage;
 
     ErrorMessage << "[" << Location.file_name() << " at line " 
@@ -95,10 +93,30 @@ void AMPLSolver::DefineProblem(const Solver::OptimisationProblem & TheProblem,
                                const Address TheOracle)
 {
   Theron::ConsoleOutput Output;
-  Output << "AMPL Solver received the AMPL problem: " << TheProblem.dump(2)
+  Output << "AMPL Solver received the AMPL problem: " << std::endl
+         << TheProblem.dump(2)
          << std::endl;
 
   //ProblemDefinition.read( SaveFile( TheProblem ) );
+
+  if( TheProblem.contains( Solver::ObjectiveFunctionLabel ) )
+    DefaultObjectiveFunction = TheProblem.at( Solver::ObjectiveFunctionLabel );
+  else
+  {
+    std::source_location Location = std::source_location::current();
+    std::ostringstream ErrorMessage;
+
+    ErrorMessage  << "[" << Location.file_name() << " at line " 
+                  << Location.line()
+                  << "in function " << Location.function_name() <<"] " 
+                  << "The problem definition must contain a default objective "
+                  << "function under the key [" 
+                  << Solver::ObjectiveFunctionLabel
+                  << "]" << std::endl;
+
+    throw std::invalid_argument( ErrorMessage.str() );
+  }
+
   Output << "Problem loaded!" << std::endl;
 }
 
@@ -168,16 +186,62 @@ void AMPLSolver::SolveProblem(
   // objective functions as 'dropped'. Note that this is experimental code
   // as the multi-objective possibilities in AMPL are not well documented.
 
-  std::string 
-  OptimisationGoal = TheContext.at( Solver::ObjectiveFunctionLabel );
+  std::string OptimisationGoal;
+
+  if( TheContext.contains( Solver::ObjectiveFunctionLabel ) )
+    OptimisationGoal = TheContext.at( Solver::ObjectiveFunctionLabel );
+  else if( !DefaultObjectiveFunction.empty() )
+    OptimisationGoal = DefaultObjectiveFunction;
+  else
+  {
+    std::source_location Location = std::source_location::current();
+    std::ostringstream ErrorMessage;
+
+    ErrorMessage  << "[" << Location.file_name() << " at line " 
+                  << Location.line()
+                  << "in function " << Location.function_name() <<"] " 
+                  << "No default objective function is defined and "
+                  << "the Application Execution Context message did "
+                  << "not define an objective function:"
+                  << std::endl << TheContext.dump(2)
+                  << std::endl;
+
+    throw std::invalid_argument( ErrorMessage.str() );
+  }
+
+  // The objective function name given must correspond to a function 
+  // defined in the model, which implies that one function must be 
+  // activated.
+
+  bool ObjectiveFunctionActivated = false;
 
   for( auto TheObjective : ProblemDefinition.getObjectives() )
     if( TheObjective.name() == OptimisationGoal )
+    {
       TheObjective.restore();
+      ObjectiveFunctionActivated = true;
+    }
     else
       TheObjective.drop();
- 
-  // The problem can then be solved.
+
+  // An exception is thrown if there is no objective function activated
+
+  if( !ObjectiveFunctionActivated )
+  {
+    std::source_location Location = std::source_location::current();
+    std::ostringstream ErrorMessage;
+
+    ErrorMessage  << "[" << Location.file_name() << " at line " 
+                  << Location.line()
+                  << "in function " << Location.function_name() <<"] " 
+                  << "The objective function label " << OptimisationGoal 
+                  << " does not correspond to any objective function in the "
+                  << "model" << std::endl;
+
+    throw std::invalid_argument( ErrorMessage.str() );
+  }
+
+  // The problem is valid and can then be solved.
 
   Optimize();
 
@@ -199,10 +263,10 @@ void AMPLSolver::SolveProblem(
   // The found solution can then be returned to the requesting actor or topic
 
   Send( Solver::Solution(
-    TheContext.at( Solver::ContextIdentifier ),
     TheContext.at( Solver::TimeStamp ).get< Solver::TimePointType >(),
-    TheContext.at( Solver::ObjectiveFunctionLabel ),
-    ObjectiveValues, VariableValues
+    TheContext.at( Solver::ObjectiveFunctionLabel ), //TO DO: Where does this come from?
+    ObjectiveValues, VariableValues, 
+    TheContext.at( DeploymentFlag ).get<bool>()
   ), TheRequester ); 
 }
 
@@ -229,7 +293,8 @@ AMPLSolver::AMPLSolver( const std::string & TheActorName,
   NetworkingActor( Actor::GetAddress().AsString() ),
   Solver( Actor::GetAddress().AsString() ),
   ProblemFileDirectory( ProblemPath ),
-  ProblemDefinition( InstallationDirectory )
+  ProblemDefinition( InstallationDirectory ),
+  DefaultObjectiveFunction()
 {
   RegisterHandler( this, &AMPLSolver::DataFileUpdate );
 

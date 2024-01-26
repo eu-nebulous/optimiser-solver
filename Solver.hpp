@@ -101,6 +101,12 @@ public:
   // though all objective function values will be returned with the solution, 
   // the solution will maximise only the objective function whose label is 
   // given in the application execution context request message.
+  //
+  // The Application Execution Cntext message may contain the name of the 
+  // objective function to maximise. If so, this should be stored under the 
+  // key name indicated here. However, if the objective function name is not 
+  // given, the default objective function is used. The default objective 
+  // function will be named when defining the optimisation problem.
 
   static constexpr std::string_view 
   ObjectiveFunctionLabel = "ObjectiveFunction";
@@ -110,6 +116,19 @@ public:
   // be at least one metric-value pair for the request to be valid.
 
   static constexpr std::string_view ExecutionContext = "ExecutionContext";
+
+  // Finally, the execution context can come from the Metric Collector actor
+  // as a consequence of an SLO Violation being detected. In this case the 
+  // optimised solution found by the solver should trigger a reconfiguration.
+  // However, various application execution context can also be tried for 
+  // simulating future events and to investigate which configuration would be
+  // the best for these situations. In this case the optimised solution should
+  // not reconfigure the running application. For this reason there is a flag
+  // in the message indicating whether the solution should be deployed, and 
+  // its default value is 'false' to prevent solutions form accidentially being
+  // deployed.
+
+  static constexpr std::string_view DeploymentFlag = "DeploySolution";
 
   // To ensure that the execution context is correctly provided by the senders
   // The expected metric value structure is defined as a type based on the 
@@ -144,24 +163,43 @@ public:
     static constexpr std::string_view MessageIdentifier 
                      = "eu.nebulouscloud.optimiser.solver.context";
 
-    ApplicationExecutionContext( const ContextIdentifierType & TheIdentifier, 
-                                 const TimePointType MicroSecondTimePoint,
+    ApplicationExecutionContext( const TimePointType MicroSecondTimePoint,
                                  const std::string ObjectiveFunctionID,
-                                 const MetricValueType & TheContext )
+                                 const MetricValueType & TheContext,
+                                 bool DeploySolution = false )
     : JSONTopicMessage( std::string( MessageIdentifier ),
-    { { std::string( ContextIdentifier ), TheIdentifier },
-      { std::string( TimeStamp ), MicroSecondTimePoint },
+    { { std::string( TimeStamp ), MicroSecondTimePoint },
       { std::string( ObjectiveFunctionLabel ), ObjectiveFunctionID },
-      { std::string( ExecutionContext ), TheContext } }
-     ) {}
+      { std::string( ExecutionContext ), TheContext },
+      { std::string( DeploymentFlag ), DeploySolution }
+    }) {}
+
+    // The constructor omitting the objective function identifier is similar
+    // but without the objective function string.
+
+    ApplicationExecutionContext( const TimePointType MicroSecondTimePoint,
+                                 const MetricValueType & TheContext,
+                                 bool DeploySolution = false )
+    : JSONTopicMessage( std::string( MessageIdentifier ),
+    { { std::string( TimeStamp ), MicroSecondTimePoint },
+      { std::string( ExecutionContext ), TheContext },
+      { std::string( DeploymentFlag ), DeploySolution }
+    }) {}
+
+    // The copy constructor simply passes the job on to the JSON Topic
+    // message for copying the message
 
     ApplicationExecutionContext( const ApplicationExecutionContext & Other )
     : JSONTopicMessage( Other )
     {}
 
+    // The default constructor simply stores the message identifier
+
     ApplicationExecutionContext()
     : JSONTopicMessage( std::string( MessageIdentifier ) )
     {}
+
+    // The default destrucor is used
 
     virtual ~ApplicationExecutionContext() = default;
   };
@@ -210,17 +248,18 @@ public:
     static constexpr std::string_view MessageIdentifier 
                      = "eu.nebulouscloud.optimiser.solver.solution";
 
-    Solution( const ContextIdentifierType & TheIdentifier,
-              const TimePointType MicroSecondTimePoint,
+    Solution( const TimePointType MicroSecondTimePoint,
               const std::string ObjectiveFunctionID,
               const ObjectiveValuesType & TheObjectiveValues,
-              const VariableValuesType & TheVariables )
+              const VariableValuesType & TheVariables,
+              bool DeploySolution )
     : JSONTopicMessage( std::string( MessageIdentifier ) ,
-      { { std::string( ContextIdentifier ), TheIdentifier },
-        { std::string( TimeStamp ), MicroSecondTimePoint   },
+      { { std::string( TimeStamp ), MicroSecondTimePoint   },
         { std::string( ObjectiveFunctionLabel ), ObjectiveFunctionID },
         { std::string( ObjectiveValues ) , TheObjectiveValues },
-        { std::string( VariableValues ), TheVariables } } )
+        { std::string( VariableValues ), TheVariables },
+        { std::string( DeploymentFlag ), DeploySolution }
+      } )
       {}
     
     Solution()

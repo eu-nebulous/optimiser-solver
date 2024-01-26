@@ -127,7 +127,26 @@ protected:
   // constant string
 
   static constexpr std::string_view AMPLProblemTopic 
-                                    = "AMPL::OptimisationProblem";
+                   = "eu.nebulouscloud.optimiser.solver.model";
+
+  // The JSON message received on this topic is supposed to contain three keys
+  // 1) The filename of the problem file
+  // 2) The file content as a single string
+  // 3) The default objective function (defined in the Solver class)
+
+  static constexpr std::string_view FileName = "FileName",
+                                    FileContent = "FileContent";
+
+  // The AMPL problem file can contain many objective functions, but can be 
+  // solved only for one objective function at the time. The name of the 
+  // default objective function is therefore stored together with the model 
+  // in the above Define Problem handler. If the default objective function 
+  // label is not provided with the optimisation problem message, an 
+  // invalid argument exception will be thrown.
+
+private:
+
+  std::string DefaultObjectiveFunction;
 
   // --------------------------------------------------------------------------
   // Data file updates

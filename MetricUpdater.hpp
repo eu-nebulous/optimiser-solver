@@ -123,19 +123,11 @@ constexpr std::string_view MetricValueRootString
 // compared to a threshold, currently set to zero to ensure that every event 
 // message will trigger a reconfiguration.
 //
-// However, the Metric updater will get this message from the Optimiser 
-// Controller component only if an update must be made. The message must 
-// contain a unique identifier, a time point for the solution, and the objective
-// function to be maximised.
-
-constexpr std::string_view SLOIdentifier = "Identifier";
-constexpr std::string_view ObjectiveFunctionName = "ObjectiveFunction";
-
 // The messages from the Optimizer Controller will be sent on a topic that 
 // should follow some standard topic convention.
 
 constexpr std::string_view SLOViolationTopic 
-          = "eu.nebulouscloud.optimiser.solver.slo";
+          = "eu.nebulouscloud.monitoring.slo.severity_value";
 
 /*==============================================================================
 
@@ -265,12 +257,10 @@ private:
   // The SLO Violation detector publishes an event to indicate that at least 
   // one of the constraints for the application deployment will be violated in 
   // the predicted future, and that the search for a new solution should start.
-  // This message is caught by the Optimisation Controller and republished 
-  // adding a unique event identifier enabling the Optimisation Controller to
-  // match the produced solution with the event and deploy the right 
-  // configuration.The message must also contain the name of the objective 
-  // function to maximise. This name must match the name in the optimisation
-  // model sent to the solver.
+  // This will trigger the the publication of the Solver's Application Execution 
+  // context message. The context message will contain the current status of the
+  // metric values, and trigger a solver to find a new, optimal variable 
+  // assignment to be deployed to resolve the identified problem.
 
   class SLOViolation
   : public Theron::AMQ::JSONTopicMessage
