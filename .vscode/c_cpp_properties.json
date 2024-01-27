@@ -7,11 +7,12 @@
                 "/home/GHo/Documents/Code/CxxOpts/include",
                 "/opt/AMPL/amplapi/include/",
                 "${workspaceFolder}/**",
-                "/usr/lib/gcc/x86_64-redhat-linux/13/../../../../include/c++/13"
+                "/usr/lib/gcc/x86_64-redhat-linux/13/../../../../include/c++/13",
+                "/home/GHo/Documents/Code/Theron++"
             ],
             "defines": [],
             "cStandard": "c23",
-            "intelliSenseMode": "${default}",
+            "intelliSenseMode": "linux-gcc-x64",
             "compilerPath": "/usr/bin/g++",
             "compilerArgs": [
                 "-std=c++23",

@@ -95,8 +95,9 @@ constexpr std::string_view MetricSubscriptions
 // https://158.39.75.54/projects/nebulous-collaboration-hub/wiki/slo-severity-based-violation-detector
 // where the name of the metric is defined under as sub-key.
 
-constexpr std::string_view MetricList = "metric_list";
-constexpr std::string_view MetricName = "name";
+constexpr std::string_view MetricList = "metric_list",
+                           MetricName = "name",
+                           MetricVersionCounter = "version";
 
 // The metric value messages will be published on different topics and to 
 // check if an inbound message is from a metric value topic, it is necessary 
@@ -209,6 +210,16 @@ private:
 
     virtual ~MetricTopic() = default;
   };
+
+  // The metric definition message "Event type III" of the EMS is sent every 
+  // 60 seconds in order to inform new components or crashed components about
+  // the metrics. The version number of the message is a counter that indicates
+  // if the set of metrics has changed. Thus the message should be ignored 
+  // as long as the version number stays the same. The version number of the
+  // current set of metrics is therefore cached to avoid redefining the 
+  // metrics.
+
+  long int MetricsVersion;
 
   // The handler for this message will check each attribute value of the 
   // received JSON struct, and those not already existing in the metric 

@@ -38,24 +38,59 @@ namespace NebulOuS
 // metric values must be updated before the complete set of metrics will be 
 // used for finding a better configuration for the application's execution 
 // context given by the metric values.
+//
+// The message is just considered if the version number of the message is larger
+// than the version of the current set of metrics. The complicating factor is 
+// to deal with metrics that have changed in the case the metric version is 
+// increased. Then new metrics must be subscribed, deleted metrics must be 
+// unsubscribed, and values for kept metrics must be kept.
 
 void MetricUpdater::AddMetricSubscription( const MetricTopic & TheMetrics,
                                            const Address OptimiserController )
 {
   if( TheMetrics.is_object() && 
-      TheMetrics.at( NebulOuS::MetricList ).is_array() )
+      TheMetrics.at( NebulOuS::MetricList ).is_array() && 
+      (MetricsVersion < TheMetrics.at( MetricVersionCounter ).get<long int>()) )
   {
+    // The first step is to try inserting the metrics into the metric value map
+    // and if this is successful, a subscription is created for the publisher 
+    // of this metric value. The metric names are recorded since some of them 
+    // may correspond to known metrics, some of them may correspond to metrics 
+    // that are new.
+
+    std::set< std::string > MetricNames;
+
     for (auto & MetricRecord : TheMetrics.at( NebulOuS::MetricList ) )
     {
-      auto [ MetricRecordPointer, NewMetric ] = MetricValues.try_emplace( 
+      auto [ MetricRecordPointer, MetricAdded ] = MetricValues.try_emplace( 
              MetricRecord.at( NebulOuS::MetricName ), JSON() );
 
-      if( NewMetric )
+      MetricNames.insert( MetricRecordPointer->first );
+
+      if( MetricAdded )
         Send( Theron::AMQ::NetworkLayer::TopicSubscription( 
               Theron::AMQ::NetworkLayer::TopicSubscription::Action::Subscription,
               std::string( MetricValueRootString ) + MetricRecordPointer->first ), 
-              Theron::AMQ::Network::GetAddress( Theron::Network::Layer::Session) );
+              //Theron::AMQ::Network::GetAddress( Theron::Network::Layer::Session) );
+              GetSessionLayerAddress() );
     }
+
+    // There could be some metric value records that were defined by the previous
+    // metrics defined, but missing from the new metric set. If this is the case,
+    // the metric value records for the missing metrics should be unsubcribed 
+    // and their metric records removed.
+
+    for( const auto & TheMetric : std::views::keys( MetricValues ) )
+      if( !MetricName.contains( TheMetric ) )
+      {
+        Send( Theron::AMQ::NetworkLayer::TopicSubscription( 
+                Theron::AMQ::NetworkLayer::TopicSubscription::Action::CloseSubscription,
+                std::string( MetricValueRootString ) + TheMetric ), 
+                //Theron::AMQ::Network::GetAddress( Theron::Network::Layer::Session) );
+                GetSessionLayerAddress() );
+
+        MetricValues.erase( TheMetric );
+      }
   }
   else
   {
@@ -184,7 +219,8 @@ MetricUpdater::MetricUpdater( const std::string UpdaterName,
 : Actor( UpdaterName ),
   StandardFallbackHandler( Actor::GetAddress().AsString() ),
   NetworkingActor( Actor::GetAddress().AsString() ),
-  MetricValues(), ValidityTime(0), TheSolverManager( ManagerOfSolvers )
+  MetricValues(), ValidityTime(0), TheSolverManager( ManagerOfSolvers ),
+  MetricsVersion(-1)
 {
   RegisterHandler( this, &MetricUpdater::AddMetricSubscription );
   RegisterHandler( this, &MetricUpdater::UpdateMetricValue     );
