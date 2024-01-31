@@ -264,8 +264,7 @@ void AMPLSolver::SolveProblem(
 
   Send( Solver::Solution(
     TheContext.at( Solver::TimeStamp ).get< Solver::TimePointType >(),
-    TheContext.at( Solver::ObjectiveFunctionLabel ), //TO DO: Where does this come from?
-    ObjectiveValues, VariableValues, 
+    OptimisationGoal, ObjectiveValues, VariableValues, 
     TheContext.at( DeploymentFlag ).get<bool>()
   ), TheRequester ); 
 }
