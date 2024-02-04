@@ -284,8 +284,8 @@ public:
   {
   public:
 
-    static constexpr std::string_view MessageIdentifier 
-                     = "eu.nebulouscloud.optimiser.solver.model";
+    static constexpr std::string_view 
+           MessageIdentifier    = "eu.nebulouscloud.optimiser.solver.model";
 
     OptimisationProblem( const JSON & TheProblem )
     : JSONTopicMessage( std::string( MessageIdentifier ), TheProblem )

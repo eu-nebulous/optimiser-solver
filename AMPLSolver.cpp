@@ -23,9 +23,13 @@ namespace NebulOuS
 {
 
 // -----------------------------------------------------------------------------
-// Utility function
+// Utility functions
 // -----------------------------------------------------------------------------
 //
+// There are two situations when it is necessary to store a file from a message:
+// Firstly when the AMPL model is defined, and second every time a data file 
+// is received updating AMPL model parameters. Hence the common file creation
+// is taken care of by a dedicated function.
 
 std::string AMPLSolver::SaveFile( const JSON & TheMessage, 
                                   const std::source_location & Location )
@@ -77,17 +81,77 @@ std::string AMPLSolver::SaveFile( const JSON & TheMessage,
   }
 }
 
+// Setting named AMPL parameters from JSON objects requires that the JSON object
+// is converted to the same type as the AMPL parameter. This conversion 
+// requires that the type of the parameter is tested, and there is a shared 
+// function to set a named parameter from the JSON object.
+
+void AMPLSolver::SetAMPLParameter( const std::string & ParameterName, 
+                                   const JSON & ParameterValue )
+{
+  ampl::Parameter 
+  TheParameter = ProblemDefinition.getParameter( ParameterName );
+  
+  switch ( ParameterValue.type() )
+  {
+    case JSON::value_t::number_integer :
+    case JSON::value_t::number_unsigned :
+    case JSON::value_t::boolean :
+      TheParameter.set( ParameterValue.get< long >() );
+      break;
+    case JSON::value_t::number_float :
+      TheParameter.set( ParameterValue.get< double >() );
+      break;
+    case JSON::value_t::string :
+      TheParameter.set( ParameterValue.get< std::string >() );
+      break;
+    default:
+      {
+        std::source_location Location = std::source_location::current();
+        std::ostringstream ErrorMessage;
+
+        ErrorMessage  << "[" << Location.file_name() << " at line " 
+                      << Location.line()
+                      << "in function " << Location.function_name() <<"] " 
+                      << "The JSON value " << ParameterValue 
+                      << " has JSON type " 
+                      << static_cast< int >( ParameterValue.type() )
+                      << " which is not supported"
+                      << std::endl;
+
+        throw std::invalid_argument( ErrorMessage.str() );
+      }
+      break;
+  }
+}
+
 // -----------------------------------------------------------------------------
-// Optimisation
+// Problem definition
 // -----------------------------------------------------------------------------
 //
 // The first step in solving an optimisation problem is to define the problme 
 // involving the decision variables, the parameters, and the constraints over
-// these entities. The problem is received as an AMQ JSON message where where
-// the only key is the file name and the value is the AMPL model file. This file
-// is first saved, and if there is no exception thrown form the save file 
-// function, the filename will be returned and read back into the problem 
-// definition.
+// these entities. The AMPL Domoain Specific Language (DSL) defining the 
+// problem is received as a JSON message where the File Name and the File 
+// Content is managed by the file reader utility function. 
+//
+// After reading the file the name of the default objective function is taken
+// from the message. Not that this is a mandatory field and the solver will 
+// throw an exception if the field does not exist.
+//
+// Finally, the optimisation happens relative to the current configuration as 
+// baseline aiming to improve the variable values. However, this may need that
+// candidate variable values are compared with the current values of the same 
+// variables. Hence, the current variable values are defined to be "constants"
+// of the optimisation problem. These constants must be set by the solver for 
+// a found solution that will be deployed, and this requires a mapping between
+// the name of a constant and the name of the variable used to initialise the 
+// constant. This map is initialised from the message, if it is provided, and 
+// the initial values are set for the corresponding "constant" parameters in 
+// the problem definition. The constant field holds a JSON map where the keys
+// are the names of the constants defined as parameters in the problem 
+// definition, and the value is again a map with two fields: The variable name
+// and the variable's intial value.
 
 void AMPLSolver::DefineProblem(const Solver::OptimisationProblem & TheProblem,
                                const Address TheOracle)
@@ -97,7 +161,13 @@ void AMPLSolver::DefineProblem(const Solver::OptimisationProblem & TheProblem,
          << TheProblem.dump(2)
          << std::endl;
 
-  //ProblemDefinition.read( SaveFile( TheProblem ) );
+  // First storing the AMPL problem file from its definition in the message
+  // and read the file back to the AMPL interpreter.
+
+  ProblemDefinition.read( SaveFile( TheProblem ) );
+
+  // The next is to read the label of the default objective function and 
+  // store this. An invalid argument exception is thrown if the field is missing
 
   if( TheProblem.contains( Solver::ObjectiveFunctionLabel ) )
     DefaultObjectiveFunction = TheProblem.at( Solver::ObjectiveFunctionLabel );
@@ -117,9 +187,27 @@ void AMPLSolver::DefineProblem(const Solver::OptimisationProblem & TheProblem,
     throw std::invalid_argument( ErrorMessage.str() );
   }
 
+  // After all the manatory fields have been processed, the set of constants 
+  // will be processed storing the mapping from variable value to constant.
+
+  if( TheProblem.contains( ConstantsLabel ) &&
+      TheProblem.at( ConstantsLabel ).is_object() )
+    for( const auto & [ ConstantName, ConstantRecord ] :
+                      TheProblem.at( ConstantsLabel ).items() )
+    {
+      VariablesToConstants.emplace( ConstantRecord.at( VariableName ), 
+                                    ConstantName );
+      SetAMPLParameter( ConstantName, 
+                        ConstantRecord.at( InitialConstantValue ) );
+    }
+
   Output << "Problem loaded!" << std::endl;
 }
 
+// -----------------------------------------------------------------------------
+// Optimimsation parameter values
+// -----------------------------------------------------------------------------
+//
 // The data file(s) corresponding to the current optimisation problem will be 
 // sent in the same way and separately file by file. The logic is the same as 
 // the Define Problem message handler: The save file is used to store the 
@@ -131,6 +219,10 @@ void AMPLSolver::DataFileUpdate( const DataFileMessage & TheDataFile,
   ProblemDefinition.readData( SaveFile( TheDataFile ) );
 }
 
+// -----------------------------------------------------------------------------
+// Solving
+// -----------------------------------------------------------------------------
+//
 // The solver function is more involved as must set the metric values received
 // in the application execution context message as parameter values for the 
 // optimisation problem, then solve for the optimal objective value, and finally
@@ -146,41 +238,7 @@ void AMPLSolver::SolveProblem(
 
   for( const auto & [ TheName, MetricValue ] : 
        Solver::MetricValueType( TheContext.at( Solver::ExecutionContext ) ) )
-  {
-    ampl::Parameter TheParameter = ProblemDefinition.getParameter( TheName );
-    
-    switch ( MetricValue.type() )
-    {
-      case JSON::value_t::number_integer :
-      case JSON::value_t::number_unsigned :
-      case JSON::value_t::boolean :
-        TheParameter.set( MetricValue.get< long >() );
-        break;
-      case JSON::value_t::number_float :
-        TheParameter.set( MetricValue.get< double >() );
-        break;
-      case JSON::value_t::string :
-        TheParameter.set( MetricValue.get< std::string >() );
-        break;
-      default:
-        {
-          std::source_location Location = std::source_location::current();
-          std::ostringstream ErrorMessage;
-
-          ErrorMessage  << "[" << Location.file_name() << " at line " 
-                        << Location.line()
-                        << "in function " << Location.function_name() <<"] " 
-                        << "The JSON value " << MetricValue 
-                        << " has JSON type " 
-                        << static_cast< int >( MetricValue.type() )
-                        << " which is not supported"
-                        << std::endl;
-
-          throw std::invalid_argument( ErrorMessage.str() );
-        }
-        break;
-    }
-  }
+    SetAMPLParameter( TheName, MetricValue );
 
   // Setting the given objective as the active objective and all other
   // objective functions as 'dropped'. Note that this is experimental code
@@ -253,19 +311,31 @@ void AMPLSolver::SolveProblem(
   for( auto TheObjective : ProblemDefinition.getObjectives() )
     ObjectiveValues.emplace( TheObjective.name(), TheObjective.value() );
 
-  // The variable values are obtained in the same way
+  // The variable values are obtained in the same way, but each variable 
+  // is checked to see if there is a constant that has to be initialised 
+  // with the variable value. The AMPL parameter whose name corresponds 
+  // with the constant name mapped from the variable name, will then 
+  // be initialised. The constant values are only to be updated if the 
+  // application execution context has the deployment flag set.
 
   Solver::Solution::VariableValuesType VariableValues;
+  bool DeploymentFlagSet = TheContext.at( DeploymentFlag ).get<bool>();
 
   for( auto Variable : ProblemDefinition.getVariables() )
+  {
     VariableValues.emplace( Variable.name(), Variable.value() );
+
+    if( DeploymentFlagSet && VariablesToConstants.contains( Variable.name() ) )
+      SetAMPLParameter( VariablesToConstants.at( Variable.name() ),
+                        JSON( Variable.value() ) );
+  }
 
   // The found solution can then be returned to the requesting actor or topic
 
   Send( Solver::Solution(
     TheContext.at( Solver::TimeStamp ).get< Solver::TimePointType >(),
     OptimisationGoal, ObjectiveValues, VariableValues, 
-    TheContext.at( DeploymentFlag ).get<bool>()
+    DeploymentFlagSet
   ), TheRequester ); 
 }
 

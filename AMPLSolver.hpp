@@ -33,6 +33,7 @@ License: MPL2.0 (https://www.mozilla.org/en-US/MPL/2.0/)
 #include <list>                                 // To store names
 #include <filesystem>                           // For problem files
 #include <source_location>                      // For better errors
+#include <map>                                  // Storing key-value pairs
 
 // Other packages
 
@@ -101,6 +102,12 @@ private:
               const std::source_location  & Location 
                                           = std::source_location::current() );
 
+  // There is also a utility function to look up a named AMPL parameter and 
+  // sets it value based on a JSON scalar value.
+
+  void SetAMPLParameter( const std::string & ParameterName, 
+                         const JSON & ParameterValue );
+
   // --------------------------------------------------------------------------
   // The optimisation problem
   // --------------------------------------------------------------------------
@@ -129,13 +136,22 @@ protected:
   static constexpr std::string_view AMPLProblemTopic 
                    = "eu.nebulouscloud.optimiser.solver.model";
 
-  // The JSON message received on this topic is supposed to contain three keys
+  // The JSON message received on this topic is supposed to contain several 
+  // keys in the JSON message
   // 1) The filename of the problem file
   // 2) The file content as a single string
   // 3) The default objective function (defined in the Solver class)
+  // 4) An optional constants section containing constant names as keys
+  //    and the values will be another map containing the variable 
+  //    whose value should be passed to the constant, and the initial 
+  //    value of the constant. 
 
-  static constexpr std::string_view FileName = "FileName",
-                                    FileContent = "FileContent";
+  static constexpr std::string_view 
+         FileName             = "FileName",
+         FileContent          = "FileContent",
+         ConstantsLabel       = "Constants",
+         VariableName         = "Variable",
+         InitialConstantValue = "Value";
 
   // The AMPL problem file can contain many objective functions, but can be 
   // solved only for one objective function at the time. The name of the 
@@ -147,6 +163,12 @@ protected:
 private:
 
   std::string DefaultObjectiveFunction;
+
+  // To set the constant values to the right variable values, the mapping 
+  // between the variable name and the constant name must be stored in 
+  // a map. 
+
+  std::map< std::string, std::string > VariablesToConstants;
 
   // --------------------------------------------------------------------------
   // Data file updates
