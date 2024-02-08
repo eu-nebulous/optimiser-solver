@@ -223,20 +223,31 @@ int main( int NumberOfCLIOptions, char ** CLIOptionStrings )
     };
 
     // Setting the application filter is slightly more complicated as it 
-    // involves setting the filter map for the sender.
+    // involves setting the filter map for the sender. However, this is not 
+    // well documented and the current implmenentation is based on the 
+    // example for an earlier Proton version (0.32.0) and the example at
+    // https://qpid.apache.org/releases/qpid-proton-0.32.0/proton/cpp/examples/selected_recv.cpp.html
 
     virtual proton::receiver_options ReceiverOptions( void ) const override
     {
       proton::source::filter_map TheFilter;
       proton::source_options     TheSourceOptions;
+      proton::symbol             FilterKey("selector");
+      proton::value              FilterValue;
+      proton::codec::encoder     EncodedFilter( FilterValue );
       proton::receiver_options   TheOptions( 
               Theron::AMQ::NetworkLayer::AMQProperties::ReceiverOptions() );
 
-      std::ostringstream FilterValue;
+      std::ostringstream SelectorString;
 
-      FilterValue << "application = '" << ApplicationID << "'"; 
+      SelectorString << "application = '" << ApplicationID << "'";
 
-      TheFilter.put("apache.org:selector-filter:string", FilterValue.str() );
+      EncodedFilter << proton::codec::start::described()
+                    << proton::symbol("apache.org:selector-filter:string")
+                    << SelectorString.str()
+                    << proton::codec::finish();
+
+      TheFilter.put( FilterKey, FilterValue );
       TheSourceOptions.filters( TheFilter );
       TheOptions.source( TheSourceOptions );
 
