@@ -217,6 +217,8 @@ void AMPLSolver::DataFileUpdate( const DataFileMessage & TheDataFile,
                                  const Address TheOracle )
 {
   ProblemDefinition.readData( SaveFile( TheDataFile ) );
+  //Theron::ConsoleOutput Output;
+  //Output << "Message recevied is: " << std::endl << TheDataFile.dump(2) << std::endl;
 }
 
 // -----------------------------------------------------------------------------
