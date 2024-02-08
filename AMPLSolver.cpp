@@ -363,7 +363,7 @@ AMPLSolver::AMPLSolver( const std::string & TheActorName,
   Solver( Actor::GetAddress().AsString() ),
   ProblemFileDirectory( ProblemPath ),
   ProblemDefinition( InstallationDirectory ),
-  DefaultObjectiveFunction()
+  DefaultObjectiveFunction(), VariablesToConstants()
 {
   RegisterHandler( this, &AMPLSolver::DataFileUpdate );
 
