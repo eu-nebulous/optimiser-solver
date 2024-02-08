@@ -174,29 +174,31 @@ private:
   // Data file updates
   // --------------------------------------------------------------------------
   //
-  // The data files are assumed to be published on a dedicated topic for the 
-  // optimiser
-
-public:
-
-  static constexpr std::string_view DataFileTopic 
-                   = "eu.nebulouscloud.optimiser.solver.data";
-
   // The message defining the data file is a JSON topic message with the same
   // structure as the optimisation problem message: It contains only one 
   // attribute, which is the name of the data file, and the data file 
   // content as the value. This content is just saved to the problem file 
   // directory before it is read back to the AMPL problem definition. 
+  
+public:
 
   class DataFileMessage
   : public Theron::AMQ::JSONTopicMessage
   {
   public:
 
+    // The data files are assumed to be published on a dedicated topic for the 
+    // optimiser
+
+    static constexpr std::string_view MessageIdentifier 
+                   = "eu.nebulouscloud.optimiser.solver.data";
+
+
     DataFileMessage( const std::string & TheDataFileName, 
                      const JSON & DataFileContent )
-    : JSONTopicMessage( std::string( DataFileTopic ), 
-                        { TheDataFileName, DataFileContent } )
+    : JSONTopicMessage( std::string( MessageIdentifier ), 
+      { { FileName, TheDataFileName }, 
+        { FileContent, DataFileContent } } )
     {}
 
     DataFileMessage( const DataFileMessage & Other )
@@ -204,7 +206,7 @@ public:
     {}
 
     DataFileMessage()
-    : JSONTopicMessage( std::string( DataFileTopic ) )
+    : JSONTopicMessage( std::string( MessageIdentifier ) )
     {}
 
     virtual ~DataFileMessage() = default;

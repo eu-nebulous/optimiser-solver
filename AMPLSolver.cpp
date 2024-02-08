@@ -373,7 +373,7 @@ AMPLSolver::AMPLSolver( const std::string & TheActorName,
 
   Send( Theron::AMQ::NetworkLayer::TopicSubscription(
     Theron::AMQ::NetworkLayer::TopicSubscription::Action::Subscription,
-    Theron::AMQ::TopicName( DataFileTopic )
+    Theron::AMQ::TopicName( DataFileMessage::MessageIdentifier )
   ), GetSessionLayerAddress() );
 }
 
@@ -385,7 +385,7 @@ AMPLSolver::~AMPLSolver()
   if( HasNetwork() )
     Send( Theron::AMQ::NetworkLayer::TopicSubscription(
       Theron::AMQ::NetworkLayer::TopicSubscription::Action::CloseSubscription,
-      Theron::AMQ::TopicName( DataFileTopic )
+      Theron::AMQ::TopicName( DataFileMessage::MessageIdentifier )
     ), GetSessionLayerAddress() );
 }
 
