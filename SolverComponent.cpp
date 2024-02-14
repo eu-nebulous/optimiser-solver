@@ -59,7 +59,7 @@ endpoint is set to some unique identifier of the application for which this
 solver is used, e.g.,
 
   ./SolverComponent --AMPLDir /opt/AMPL \
-  --Endpoint f81ee-b42a8-a13d56-e28ec9-2f5578 --ModelDir AMPLTest/
+   --ModelDir AMPLTest/ --Endpoint f81ee-b42a8-a13d56-e28ec9-2f5578
 
 Debugging after a coredump
 
@@ -228,31 +228,31 @@ int main( int NumberOfCLIOptions, char ** CLIOptionStrings )
     // example for an earlier Proton version (0.32.0) and the example at
     // https://qpid.apache.org/releases/qpid-proton-0.32.0/proton/cpp/examples/selected_recv.cpp.html
 
-    virtual proton::receiver_options ReceiverOptions( void ) const override
-    {
-      proton::source::filter_map TheFilter;
-      proton::source_options     TheSourceOptions;
-      proton::symbol             FilterKey("selector");
-      proton::value              FilterValue;
-      proton::codec::encoder     EncodedFilter( FilterValue );
-      proton::receiver_options   TheOptions( 
-              Theron::AMQ::NetworkLayer::AMQProperties::ReceiverOptions() );
+    // virtual proton::receiver_options ReceiverOptions( void ) const override
+    // {
+    //   proton::source::filter_map TheFilter;
+    //   proton::source_options     TheSourceOptions;
+    //   proton::symbol             FilterKey("selector");
+    //   proton::value              FilterValue;
+    //   proton::codec::encoder     EncodedFilter( FilterValue );
+    //   proton::receiver_options   TheOptions( 
+    //           Theron::AMQ::NetworkLayer::AMQProperties::ReceiverOptions() );
 
-      std::ostringstream SelectorString;
+    //   std::ostringstream SelectorString;
 
-      SelectorString << "application = '" << ApplicationID << "'";
+    //   SelectorString << "application = '" << ApplicationID << "'";
 
-      EncodedFilter << proton::codec::start::described()
-                    << proton::symbol("apache.org:selector-filter:string")
-                    << SelectorString.str()
-                    << proton::codec::finish();
+    //   EncodedFilter << proton::codec::start::described()
+    //                 << proton::symbol("apache.org:selector-filter:string")
+    //                 << SelectorString.str()
+    //                 << proton::codec::finish();
 
-      TheFilter.put( FilterKey, FilterValue );
-      TheSourceOptions.filters( TheFilter );
-      TheOptions.source( TheSourceOptions );
+    //   TheFilter.put( FilterKey, FilterValue );
+    //   TheSourceOptions.filters( TheFilter );
+    //   TheOptions.source( TheSourceOptions );
 
-      return TheOptions;
-    }
+    //   return TheOptions;
+    // }
 
     // The application identifier must also be provided in every message to 
     // allow other receivers to filter on this.

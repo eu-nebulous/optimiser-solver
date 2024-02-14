@@ -43,7 +43,7 @@ std::string AMPLSolver::SaveFile( const JSON & TheMessage,
                         
     if( ProblemFile.is_open() )
     {
-      ProblemFile << TheMessage.at( AMPLSolver::FileContent );
+      ProblemFile << TheMessage.at( AMPLSolver::FileContent ).get<std::string>();
       ProblemFile.close();
       return TheFileName;
     }
@@ -156,11 +156,6 @@ void AMPLSolver::SetAMPLParameter( const std::string & ParameterName,
 void AMPLSolver::DefineProblem(const Solver::OptimisationProblem & TheProblem,
                                const Address TheOracle)
 {
-  Theron::ConsoleOutput Output;
-  Output << "AMPL Solver received the AMPL problem: " << std::endl
-         << TheProblem.dump(2)
-         << std::endl;
-
   // First storing the AMPL problem file from its definition in the message
   // and read the file back to the AMPL interpreter.
 
@@ -200,8 +195,6 @@ void AMPLSolver::DefineProblem(const Solver::OptimisationProblem & TheProblem,
       SetAMPLParameter( ConstantName, 
                         ConstantRecord.at( InitialConstantValue ) );
     }
-
-  Output << "Problem loaded!" << std::endl;
 }
 
 // -----------------------------------------------------------------------------
@@ -217,8 +210,6 @@ void AMPLSolver::DataFileUpdate( const DataFileMessage & TheDataFile,
                                  const Address TheOracle )
 {
   ProblemDefinition.readData( SaveFile( TheDataFile ) );
-  //Theron::ConsoleOutput Output;
-  //Output << "Message recevied is: " << std::endl << TheDataFile.dump(2) << std::endl;
 }
 
 // -----------------------------------------------------------------------------

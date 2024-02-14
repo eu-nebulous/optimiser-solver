@@ -83,11 +83,6 @@ public:
   // object. The attributes expected are defined as constant strings so that 
   // the actual textual representation can be changed without changing the code
   // 
-  // "Identifier" It can be anything corresponding to the need of the sender
-  // and returned to the sender with the found solution
-
-  static constexpr std::string_view ContextIdentifier = "Identifier";
-
   // "Timestamp" : This is the field giving the implicit order of the 
   // different application execution execution contexts waiting for being 
   // solved when there are more requests than there are solvers available to 

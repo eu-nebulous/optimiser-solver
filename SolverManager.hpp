@@ -111,7 +111,7 @@ private:
   // The solution manager dispatches the application execution contexts as 
   // requests for solutions to a pool of solvers. 
 
-  std::list< SolverType > SolverPool;
+  std::list< SolverType >       SolverPool;
   std::unordered_set< Address > ActiveSolvers, PassiveSolvers;
 
   // --------------------------------------------------------------------------
@@ -120,94 +120,64 @@ private:
   //
   // The contexts are dispatched in time sorted order. However, the time
   // to solve a problem depends on the complexity of the the context and the 
-  // results may therefore become available out-of-order. Each application 
-  // execution context should carry a unique identifier, and this is used as 
-  // the index key for quickly finding the right execution context. There is 
-  // a second view of the queue of application context where the identifiers 
-  // are sorted based on their time stamp. 
+  // results may therefore become available out-of-order.
 
-  std::unordered_map< Solver::ContextIdentifierType, 
-                      Solver:: ApplicationExecutionContext > Contexts;
+  std::multimap< Solver::TimePointType, 
+                 Solver::ApplicationExecutionContext > ContextQueue;
   
-  std::multimap< Solver::TimePointType, Solver::ContextIdentifierType > 
-  ContextExecutionQueue;
-
   // When the new applicaton execution context message arrives, it will be 
   // queued, and its time point recoreded. If there are passive solvers, 
   // the handler will immediately dispatch the contexts to each of these in 
   // time order. Essentially, it implements a 'riffle' for the passive solvers
   // and the pending contexts.The issue is that there are likely different
   // cardinalities of the two sets, and the solvers should be marked as 
-  // active after the dispatch and the context identifiers should be 
-  // removed from the queue after the dispatch.
+  // active after the dispatch and the contexts should be removed from the 
+  // queue after the dispatch.
 
   void DispatchToSolvers( void )
   {
-    if( !PassiveSolvers.empty() && !ContextExecutionQueue.empty() )
+    if( !PassiveSolvers.empty() && !ContextQueue.empty() )
     {
       for( const auto & [ SolverAddress, ContextElement ] : 
-          std::ranges::views::zip( PassiveSolvers, ContextExecutionQueue ) )
-        Send( Contexts.at( ContextElement.second ), SolverAddress );
+           std::ranges::views::zip( PassiveSolvers, ContextQueue ) )
+        Send( ContextElement.second, SolverAddress );
 
       // The number of contexts dispatched must equal the minimum of the 
       // available solvers and the available contexts.
 
       std::size_t DispatchedContexts 
-        = std::min( PassiveSolvers.size(), ContextExecutionQueue.size() );
+        = std::min( PassiveSolvers.size(), ContextQueue.size() );
 
       // Then move the passive solver addresses used to active solver addresses
 
       std::ranges::move( 
         std::ranges::subrange( PassiveSolvers.begin(), 
-                std::ranges::next( PassiveSolvers.begin(), DispatchedContexts, 
-                                   PassiveSolvers.end() ) ),
+                               std::ranges::next( PassiveSolvers.begin(), 
+                                                  DispatchedContexts, 
+                                                  PassiveSolvers.end() ) ),
         std::inserter( ActiveSolvers, ActiveSolvers.end() ) );
 
       // Then the dispatched context identifiers are removed from queue
 
-      ContextExecutionQueue.erase( ContextExecutionQueue.begin(), 
-        std::ranges::next( ContextExecutionQueue.begin(), DispatchedContexts,
-                           ContextExecutionQueue.end() ) );
+      ContextQueue.erase( ContextQueue.begin(), 
+                          std::ranges::next( ContextQueue.begin(), 
+                                             DispatchedContexts,
+                                             ContextQueue.end() ) );
     }
   }
 
   // The handler function simply enqueues the received context, records its 
-  // timesamp and dispatch as many contexts as possible to the solvers. Note
-  // that the context identifiers must be unique and there is a logic error 
-  // if there is already a context with the same identifier. Then an invalid
-  // arguemtn exception will be thrown. This strategy should be reconsidered
-  // if there will be multiple entities firing execution contexts. 
+  // timesamp and dispatch as many contexts as possible to the solvers.
 
   void HandleApplicationExecutionContext( 
     const Solver:: ApplicationExecutionContext & TheContext,
     const Address TheRequester )
   {
-    auto [_, Success] = Contexts.try_emplace( 
-      TheContext[ Solver::ContextIdentifier.data() ], TheContext );
+    ContextQueue.emplace( 
+      TheContext.at( Solver::TimeStamp ).get< Solver::TimePointType >(), 
+      TheContext );
 
-    if( Success )
-    {
-      ContextExecutionQueue.emplace( 
-        TheContext[ Solver::TimeStamp.data() ],
-        TheContext[ Solver::ContextIdentifier.data() ] );
-
-      DispatchToSolvers();
-    }
-    else
-    {
-      std::source_location Location = std::source_location::current();
-      std::ostringstream ErrorMessage;
-
-      ErrorMessage << "[" << Location.file_name() << " at line " 
-                  << Location.line()
-                  << "in function " << Location.function_name() <<"] " 
-                  << "An Application Execution Context with identifier "
-                  << TheContext[ Solver::ContextIdentifier.data() ]
-                  << " was received while there is already one with the same "
-                  << "identifer. The identifiers must be unique!";
-
-      throw std::invalid_argument( ErrorMessage.str() );
-    }
+    DispatchToSolvers();
   }
 
   // --------------------------------------------------------------------------
@@ -262,7 +232,7 @@ public:
     SolutionReceiver( SolutionTopic ),
     ContextTopic( ContextPublisherTopic ),
     SolverPool(), ActiveSolvers(), PassiveSolvers(),
-    Contexts(), ContextExecutionQueue()
+    ContextQueue()
   {
     // The solvers are created by expanding the arguments for the solvers 
     // one by one creating new elements in the solver pool. The solvers 
@@ -318,10 +288,15 @@ public:
                   << boost::core::demangle( typeid( SolverType ).name() )
                   << " from the given constructor argument types: ";
 
-    (( ErrorMessage << boost::core::demangle( typeid( SolverArguments ).name() ) << " " ), ... );
+      (( ErrorMessage << boost::core::demangle( typeid( SolverArguments ).name() ) << " " ), ... );
 
-    throw std::invalid_argument( ErrorMessage.str() );
+      throw std::invalid_argument( ErrorMessage.str() );
     }
+
+    // Finally, the handlers for the messages are registered
+
+    RegisterHandler(this, &SolverManager::HandleApplicationExecutionContext );
+    RegisterHandler(this, &SolverManager::PublishSolution );
   }
 
   // The destructor closes all the open topics if the network is still open 

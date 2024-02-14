@@ -59,14 +59,14 @@ void MetricUpdater::AddMetricSubscription( const MetricTopic & TheMetrics,
       // some of them may correspond to known metrics, some of them may 
       // correspond to metrics that are new.
 
-      std::set< std::string > MetricNames;
+      std::set< std::string > TheMetricNames;
 
       for (auto & MetricRecord : TheMetrics.at( NebulOuS::MetricList ) )
       {
         auto [ MetricRecordPointer, MetricAdded ] = MetricValues.try_emplace( 
-              MetricRecord.at( NebulOuS::MetricName ), JSON() );
+              MetricRecord.at( NebulOuS::MetricName ).get<std::string>(), JSON() );
 
-        MetricNames.insert( MetricRecordPointer->first );
+        TheMetricNames.insert( MetricRecordPointer->first );
 
         if( MetricAdded )
           Send( Theron::AMQ::NetworkLayer::TopicSubscription( 
@@ -81,7 +81,7 @@ void MetricUpdater::AddMetricSubscription( const MetricTopic & TheMetrics,
       // should be unsubcribed  and their metric records removed.
 
       for( const auto & TheMetric : std::views::keys( MetricValues ) )
-        if( !MetricName.contains( TheMetric ) )
+        if( !TheMetricNames.contains( TheMetric ) )
         {
           Send( Theron::AMQ::NetworkLayer::TopicSubscription( 
             Theron::AMQ::NetworkLayer::TopicSubscription::Action::CloseSubscription,
@@ -136,17 +136,10 @@ void MetricUpdater::AddMetricSubscription( const MetricTopic & TheMetrics,
 void MetricUpdater::UpdateMetricValue( 
      const MetricValueUpdate & TheMetricValue, const Address TheMetricTopic)
 {
-  Theron::ConsoleOutput Output;
-
-  Output << "Metric topic: " << TheMetricTopic.AsString() << std::endl;
-
   Theron::AMQ::TopicName TheTopic 
           = TheMetricTopic.AsString().erase( 0, 
                                       NebulOuS::MetricValueRootString.size() );
 
-  Output << "The metric: " << TheTopic << " has new value "
-         << TheMetricValue[ NebulOuS::ValueLabel ] << std::endl;
-        
   if( MetricValues.contains( TheTopic ) )
   {
     MetricValues.at( TheTopic ) = TheMetricValue[ NebulOuS::ValueLabel ];

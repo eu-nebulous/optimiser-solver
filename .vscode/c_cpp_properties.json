@@ -16,6 +16,7 @@
             "compilerPath": "/usr/bin/g++",
             "compilerArgs": [
                 "-std=c++23",
+                "-I/usr/include/",
                 "-I/home/GHo/Documents/Code/Theron++/",
                 "-I/home/GHo/Documents/Code/CxxOpts/include",
                 "-I/opt/AMPL/amplapi/include/"
