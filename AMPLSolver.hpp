@@ -153,14 +153,20 @@ protected:
          VariableName         = "Variable",
          InitialConstantValue = "Value";
 
+  // Finally, no solution will be produced unless the problem has been 
+  // defined. A flag is therefore set by the message handler indicating 
+  // that the problem has been defined.
+
+private:
+
+  bool ProblemUndefined;
+
   // The AMPL problem file can contain many objective functions, but can be 
   // solved only for one objective function at the time. The name of the 
   // default objective function is therefore stored together with the model 
   // in the above Define Problem handler. If the default objective function 
   // label is not provided with the optimisation problem message, an 
   // invalid argument exception will be thrown.
-
-private:
 
   std::string DefaultObjectiveFunction;
 

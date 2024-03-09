@@ -142,10 +142,10 @@ void MetricUpdater::UpdateMetricValue(
 
   if( MetricValues.contains( TheTopic ) )
   {
-    MetricValues.at( TheTopic ) = TheMetricValue[ NebulOuS::ValueLabel ];
+    MetricValues.at( TheTopic ) = TheMetricValue.at( NebulOuS::ValueLabel );
     
     ValidityTime = std::max( ValidityTime, 
-      TheMetricValue[ NebulOuS::TimePoint ].get< Solver::TimePointType >() );
+      TheMetricValue.at( NebulOuS::TimePoint ).get< Solver::TimePointType >() );
   }
 }
 

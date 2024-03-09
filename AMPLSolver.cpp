@@ -195,6 +195,11 @@ void AMPLSolver::DefineProblem(const Solver::OptimisationProblem & TheProblem,
       SetAMPLParameter( ConstantName, 
                         ConstantRecord.at( InitialConstantValue ) );
     }
+
+  // Finally, the problem has been defined and the flag is set to allow 
+  // the search for solutions for this problem.
+
+  ProblemUndefined = false;
 }
 
 // -----------------------------------------------------------------------------
@@ -225,6 +230,10 @@ void AMPLSolver::DataFileUpdate( const DataFileMessage & TheDataFile,
 void AMPLSolver::SolveProblem( 
   const ApplicationExecutionContext & TheContext, const Address TheRequester )
 {
+  // There is nothing to do if the application model is missing.
+
+  if( ProblemUndefined ) return;
+
   // Setting the metric values one by one. In the setting of NebulOuS a metric
   // is either a numerical value or a string. Vectors are currently not
   // supported as values.
@@ -356,6 +365,7 @@ AMPLSolver::AMPLSolver( const std::string & TheActorName,
   Solver( Actor::GetAddress().AsString() ),
   ProblemFileDirectory( ProblemPath ),
   ProblemDefinition( InstallationDirectory ),
+  ProblemUndefined( true ),
   DefaultObjectiveFunction(), VariablesToConstants()
 {
   RegisterHandler( this, &AMPLSolver::DataFileUpdate );
