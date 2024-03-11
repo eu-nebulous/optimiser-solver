@@ -5,7 +5,7 @@
 replicaCount: 1
 
 image:
-  repository: "quay.io/nebulous/optimiser-solver"
+  repository: "quay.io/nebulous/optimiser-solver-java-spring-boot-demo"
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
   tag: ""
@@ -35,6 +35,10 @@ securityContext: {}
   # readOnlyRootFilesystem: true
   # runAsNonRoot: true
   # runAsUser: 1000
+
+service:
+  type: ClusterIP
+  port: 80
 
 ingress:
   enabled: false
@@ -76,16 +80,3 @@ nodeSelector: {}
 tolerations: []
 
 affinity: {}
-
-activemq:
-  ACTIVEMQ_HOST: nebulous-activemq
-  ACTIVEMQ_PORT: 5672
-  ACTIVEMQ_USER: admin
-
-activemqSecret:
-  secretName: "activeMqPassword"
-  secretKey: "ACTIVEMQ_PASSWORD"
-
-amplLicense:
-  secretName: "ampl-license"
-  secretKey: "AMPL_LICENSE"
