@@ -1,0 +1,46 @@
+# This file tests starting the solver inside a container.  Since the
+# solver will not start without a connection to an ActiveMQ broker,
+# start one alongside it.
+
+# If we have an application id, run the solver like this:
+#
+#    APPLICATION_ID="my_application_id" docker-compose up
+#
+services:
+  activemq:
+    image: apache/activemq-classic
+    ports:
+      - "61616:61616"
+      - "5672:5672"
+      - "8161:8161"
+    networks:
+      - nebulous-activemq
+    container_name: myActiveMQ
+    environment:
+      ACTIVEMQ_WEB_USER: admin
+      ACTIVEMQ_WEB_PASSWORD: admin
+      container_name: activemq
+    healthcheck:
+      test: curl -u admin:admin -H origin:localhost --silent --show-error "http://localhost:8161/api/jolokia/exec/org.apache.activemq:type=Broker,brokerName=localhost,service=Health/healthStatus" | tee /dev/tty | grep --silent -e 'Getting Worried' -e 'Good'
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  solver:
+    image: nebulous/solver
+    depends_on:
+      activemq:
+        condition: service_healthy
+    links:
+      - activemq
+    networks:
+      - nebulous-activemq
+    environment:
+      ACTIVEMQ_HOST: activemq
+      APPLICATION_ID: ${APPLICATION_ID:-invalid-application-id}
+      # Note that an invalid license crashes the solver; no license lets it start
+      AMPL_LICENSE: ${AMPL_LICENSE}
+    container_name: solver
+
+networks:
+  nebulous-activemq:

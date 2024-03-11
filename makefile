@@ -3,21 +3,21 @@
 # Solver component
 #
 # The NebulOuS solver consists of several interacting actors using the AMQ
-# interface of the Theron++ framework. 
+# interface of the Theron++ framework.
 #
-# The following packages should be available on Fedora prior to compiling 
+# The following packages should be available on Fedora prior to compiling
 # the file
-# 
-# 	ccache 				# for effcient C++ compilations
-# 	qpid-proton-cpp* 	# Qpid Proton Active Message Queue protocol API
-# 	json-devel			# Niels Lohmann's JSON library
+#
+#	ccache			# for effcient C++ compilations
+#	qpid-proton-cpp*	# Qpid Proton Active Message Queue protocol API
+#	json-devel		# Niels Lohmann's JSON library
 #	coin-or-Couenne		# The solver to be used by AMPL
 #
-# In addtition the problem is formuated using A Mathematical Programming 
+# In addition the problem is formulated using A Mathematical Programming
 # Language (AMPL) and so it should be installed from
 # https://portal.ampl.com/user/ampl/request/amplce/trial/new
 #
-# There are source code dependencies that should be cloned to local disk 
+# There are source code dependencies that should be cloned to local disk
 #
 #	Theron++			# https://github.com/GeirHo/TheronPlusPlus.git
 #	cxxopts				# https://github.com/jarro2783/cxxopts.git
@@ -39,7 +39,7 @@ RM = rm -f
 # Paths
 #------------------------------------------------------------------------------
 #
-# The default values of the paths are given here to be overridden by build 
+# The default values of the paths are given here to be overridden by build
 # definitions on the command line for creating the component container.
 #
 # Location of the Theron++ framework relative to this make file and the code
@@ -54,8 +54,8 @@ AMPL_INCLUDE ?= /opt/AMPL/amplapi/include
 
 AMPL_LIB ?= /opt/AMPL/amplapi/lib
 
-# The solver component uses the CxxOpts class for parsing the command line 
-# options since it is header only and lighter than the Options library of 
+# The solver component uses the CxxOpts class for parsing the command line
+# options since it is header only and lighter than the Options library of
 # boost, which seems to have lost the most recent C++ features. The CxxOpts
 # library can be cloned from https://github.com/jarro2783/cxxopts
 
@@ -65,22 +65,22 @@ CxxOpts_DIR ?= /home/GHo/Documents/Code/CxxOpts/include
 # Options for the compiler and linker
 #------------------------------------------------------------------------------
 #
-# Optimisation -O3 is the highest level of optimisation and should be used 
-# with production code. -Og is the code optimising and offering debugging 
+# Optimisation -O3 is the highest level of optimisation and should be used
+# with production code. -Og is the code optimising and offering debugging
 # transparency and should be use while the code is under development
 
 OPTIMISATION_FLAG = -Og
 
-# It is useful to let the compiler generate the dependencies for the various 
-# files, and the following will produce .d files that can be included at the 
-# end. The -MMD flag is equivalent with -MD, but the latter will include system 
-# headers in the output (which we do not need here). The -MP includes an 
-# empty rule to create the dependencies so that make would not create any errors 
+# It is useful to let the compiler generate the dependencies for the various
+# files, and the following will produce .d files that can be included at the
+# end. The -MMD flag is equivalent with -MD, but the latter will include system
+# headers in the output (which we do not need here). The -MP includes an
+# empty rule to create the dependencies so that make would not create any errors
 # if the file name changes.
 
 DEPENDENCY_FLAGS = -MMD -MP
 
-# Options 
+# Options
 
 GENERAL_OPTIONS = -Wall -std=c++23 -ggdb -D_DEBUG
 INCLUDE_DIRECTORIES = -I. -I/usr/include -I$(THERON) -I$(AMPL_INCLUDE) \
@@ -89,12 +89,12 @@ INCLUDE_DIRECTORIES = -I. -I/usr/include -I$(THERON) -I$(AMPL_INCLUDE) \
 CXXFLAGS = $(GENERAL_OPTIONS) $(INCLUDE_DIRECTORIES) $(DEPENDENCY_FLAGS) \
 		   $(OPTIMISATION_FLAG)
 
-# Putting it together as the actual options given to the compiler and the 
-# linker. Note that pthread is needed on Linux systems since it seems to 
-# be the underlying implementation of std::thread. Note that it is 
-# necessary to use the "gold" linker as the standard linker requires 
-# the object files in the right order, which is hard to ensure with 
-# an archive, and the "gold" linker manages this just fine, but it 
+# Putting it together as the actual options given to the compiler and the
+# linker. Note that pthread is needed on Linux systems since it seems to
+# be the underlying implementation of std::thread. Note that it is
+# necessary to use the "gold" linker as the standard linker requires
+# the object files in the right order, which is hard to ensure with
+# an archive, and the "gold" linker manages this just fine, but it
 # requires the full static path to the custom Theron library.
 
 CFLAGS = $(DEPENDENCY_FLAGS) $(OPTIMISATION_FLAG) $(GENERAL_OPTIONS)
@@ -105,13 +105,13 @@ LDFLAGS = -fuse-ld=gold -ggdb -D_DEBUG -pthread $(THERON)/Theron++.a \
 # Theron library
 #------------------------------------------------------------------------------
 #
-# The Theron++ library must be built first and the following two targets 
-# ensures that Make will check if the libray is up-to-date or build it if 
+# The Theron++ library must be built first and the following two targets
+# ensures that Make will check if the libray is up-to-date or build it if
 # it is not.
 
-.PHONY: $(THERON)/Theron++.a 
+.PHONY: $(THERON)/Theron++.a
 
- $(THERON)/Theron++.a:
+$(THERON)/Theron++.a:
 	 make -C $(THERON) Library
 
 #------------------------------------------------------------------------------
@@ -139,13 +139,13 @@ $(OBJECTS_DIR)/%.o : %.cpp
 #------------------------------------------------------------------------------
 #
 
-# The only real target is to build the solver component whenever some of 
+# The only real target is to build the solver component whenever some of
 # the object files or the solver actors.
 
 SolverComponent: $(SOLVER_OBJECTS) $(THERON)/Theron++.a
 	$(CC) -o SolverComponent $(CXXFLAGS) $(SOLVER_OBJECTS) $(LDFLAGS)
 
-# There is also a standard target to clean the automatically generated build 
+# There is also a standard target to clean the automatically generated build
 # files
 
 clean:
