@@ -173,11 +173,6 @@ void MetricUpdater::SLOViolationHandler(
   Output << "Metric Updater: SLO violation received " << std::endl
          << SeverityMessage.dump(2) << std::endl;
 
-  // The application context can then be sent to the solution manager 
-  // using the application execution context message provided that none of 
-  // metric values are null indicating that no value has been received (yet)
-  // Thus, only if all metrics have values will the message be sent.
-
   if( !MetricValues.empty() &&
       std::ranges::none_of( MetricValues, 
       [](const auto & MetricRecord){ return MetricRecord.second.is_null(); } ))
