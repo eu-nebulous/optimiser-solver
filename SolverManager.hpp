@@ -193,7 +193,7 @@ private:
   void PublishSolution( const Solver::Solution & TheSolution, 
                         const Address TheSolver )
   {
-    Send( TheSolution, SolutionReceiver );
+    Send( TheSolution, Address( SolutionReceiver ) );
     PassiveSolvers.insert( ActiveSolvers.extract( TheSolver ) );
     DispatchToSolvers();
   }
@@ -274,7 +274,7 @@ public:
 
       Send( ExecutionControl::StatusMessage(
         ExecutionControl::StatusMessage::State::Started
-      ), Address( std::string( ExecutionControl::StatusTopic ) ) );
+      ), Address( ExecutionControl::StatusMessage::AMQTopic ) );
     }
     else
     {

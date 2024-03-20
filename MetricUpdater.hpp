@@ -88,16 +88,14 @@ constexpr std::string_view TimePoint  = "predictionTime";
 // defined next.
 
 constexpr std::string_view MetricSubscriptions 
-          = "eu.nebulouscloud.monitoring.metric_list";
+          = "eu.nebulouscloud.optimiser.controller.metric_list";
 
 // The JSON message attribute for the list of metrics is another JSON object
 // stored under the following key, see the Event type III defined in 
 // https://158.39.75.54/projects/nebulous-collaboration-hub/wiki/slo-severity-based-violation-detector
 // where the name of the metric is defined under as sub-key.
 
-constexpr std::string_view MetricList = "metric_list",
-                           MetricName = "name",
-                           MetricVersionCounter = "version";
+constexpr std::string_view MetricList = "metrics";
 
 // The metric value messages will be published on different topics and to 
 // check if an inbound message is from a metric value topic, it is necessary 
@@ -130,6 +128,14 @@ constexpr std::string_view MetricValueRootString
 constexpr std::string_view SLOViolationTopic 
           = "eu.nebulouscloud.monitoring.slo.severity_value";
 
+// When a reconfiguration has been enacted by the Optimiser Controller and 
+// a new configuration is confirmed to be running on the new platofrm, it will 
+// send a message to inform all other components that the reconfiguration 
+// has happened on the following topic.
+
+constexpr std::string_view ReconfigurationTopic
+          = "eu.nebulouscloud.optimiser.adaptations";
+
 /*==============================================================================
 
  Metric Updater
@@ -159,7 +165,7 @@ private:
   // assumed that same metric name is used both for the optimisation model 
   // and for the metric topic.
 
-  std::unordered_map< Theron::AMQ::TopicName, JSON > MetricValues;
+  Solver::MetricValueType MetricValues;
 
   // The metric values should ideally be forecasted for the same future time
   // point, but this may not be assured, and as such a zero-order hold is 
@@ -172,24 +178,26 @@ private:
 
   Solver::TimePointType ValidityTime;
 
-  // When an SLO violation message is received the current vector of metric 
-  // values should be sent as an application execution context (message) to the
-  // Solution Manager actor that will invoke a solver to find the optimal 
-  // configuration for this configuration. The Metric Updater must therefore 
-  // know the address of the Soler Manager, and this must be passed to 
-  // the constructor.
+  // There is also a flag to indicate when all metric values have received 
+  // values since optimising for a application execution context defiend all 
+  // metrics requires that at least one value is received for each metric. This
+  // condition could be tested before sending the request to find a new 
+  // solution, but this means testing all metrics in a linear scan for a 
+  // condition that will only happen initially until all metrics have been seen
+  // and so it is better for the performance if there is a flag to check for 
+  // this condition.
 
-  const Address TheSolverManager;
+  bool AllMetricValuesSet;
 
   // --------------------------------------------------------------------------
   // Subscribing to metric prediction values
   // --------------------------------------------------------------------------
   //
   // Initially, the Optimiser Controller will pass a message containing all 
-  // optimiser metric names and the AMQ topic on which their values will be 
-  // published. Essentially, these messages arrives as a JSON message with 
-  // one attribute per metric, and where the value is the topic string for 
-  // the value publisher.
+  // optimiser metric names that are used in the optimisation and therefore 
+  // constitutes the application's execution context. This message is a simple
+  // JSON map containing an array since the Optimiser Controller is not able
+  // to send just an array.
 
   class MetricTopic
   : public Theron::AMQ::JSONTopicMessage
@@ -211,22 +219,12 @@ private:
     virtual ~MetricTopic() = default;
   };
 
-  // The metric definition message "Event type III" of the EMS is sent every 
-  // 60 seconds in order to inform new components or crashed components about
-  // the metrics. The version number of the message is a counter that indicates
-  // if the set of metrics has changed. Thus the message should be ignored 
-  // as long as the version number stays the same. The version number of the
-  // current set of metrics is therefore cached to avoid redefining the 
-  // metrics.
-
-  long int MetricsVersion;
-
   // The handler for this message will check each attribute value of the 
   // received JSON struct, and those not already existing in the metric 
   // value map be added and a subscription made for the published 
   // prediction values.
 
-  void AddMetricSubscription( const MetricTopic & TheMetrics, 
+  void AddMetricSubscription( const MetricTopic & MetricDefinitions, 
                               const Address OptimiserController );
 
   // --------------------------------------------------------------------------
@@ -295,6 +293,52 @@ private:
 
   void SLOViolationHandler( const SLOViolation & SeverityMessage, 
                             const Address TheSLOTopic );
+
+  // The application execution context (message) will be sent to the
+  // Solution Manager actor that will invoke a solver to find the optimal 
+  // configuration for this configuration. The Metric Updater must therefore 
+  // know the address of the Solver Manager, and this must be passed to 
+  // the constructor and stored for for the duration of the execution
+
+  const Address TheSolverManager;
+
+  // After the sending of the application's excution context, one should not 
+  // initiate another reconfiguration because the state may the possibly be 
+  // inconsistent with the SLO Violation Detector belieivng that the old 
+  // configuration is still in effect while the new configuration is being 
+  // enacted. It is therefore a flag that will be set by the SLO Violation 
+  // handler indicating that a reconfiguration is ongoing.
+
+  bool ReconfigurationInProgress;
+
+  // When the reconfiguration has been done and the Optimizer Controller 
+  // confirms that the application is running in a new configuration, it will 
+  // send a reconfiguration completed message. This message will just be a 
+  // JSON message.
+
+  class ReconfigurationMessage
+  : public Theron::AMQ::JSONTopicMessage
+  { 
+  public:
+
+    ReconfigurationMessage( void )
+    : JSONTopicMessage( std::string( ReconfigurationTopic ) )
+    {}
+
+    ReconfigurationMessage( const ReconfigurationMessage & Other )
+    : JSONTopicMessage( Other )
+    {}
+
+    virtual ~ReconfigurationMessage() = default;
+  };
+
+  // The handler for this message will actually not use its contents, but only
+  // note that the reconfiguration has been completed to reset the 
+  // reconfiguration in progress flag allowing future SLO Violation Events to 
+  // triger new reconfigurations.
+
+  void ReconfigurationDone( const ReconfigurationMessage & TheReconfiguraton, 
+                            const Address TheReconfigurationTopic );
 
   // --------------------------------------------------------------------------
   // Constructor and destructor

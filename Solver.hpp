@@ -155,14 +155,20 @@ public:
   {
   public:
 
-    static constexpr std::string_view MessageIdentifier 
+    // First the topic on which these messages will arrive is defined so that 
+    // it can be used when subscribing.
+
+    static constexpr std::string_view AMQTopic 
                      = "eu.nebulouscloud.optimiser.solver.context";
+
+    // The full constructor takes the time point, the objective function to 
+    // solve for, and the application's execution context as the metric map
 
     ApplicationExecutionContext( const TimePointType MicroSecondTimePoint,
                                  const std::string ObjectiveFunctionID,
                                  const MetricValueType & TheContext,
                                  bool DeploySolution = false )
-    : JSONTopicMessage( std::string( MessageIdentifier ),
+    : JSONTopicMessage( std::string( AMQTopic ),
     { { std::string( TimeStamp ), MicroSecondTimePoint },
       { std::string( ObjectiveFunctionLabel ), ObjectiveFunctionID },
       { std::string( ExecutionContext ), TheContext },
@@ -170,12 +176,13 @@ public:
     }) {}
 
     // The constructor omitting the objective function identifier is similar
-    // but without the objective function string.
+    // but without the objective function string implying that the default
+    // objective function should be used.
 
     ApplicationExecutionContext( const TimePointType MicroSecondTimePoint,
                                  const MetricValueType & TheContext,
                                  bool DeploySolution = false )
-    : JSONTopicMessage( std::string( MessageIdentifier ),
+    : JSONTopicMessage( std::string( AMQTopic ),
     { { std::string( TimeStamp ), MicroSecondTimePoint },
       { std::string( ExecutionContext ), TheContext },
       { std::string( DeploymentFlag ), DeploySolution }
@@ -191,7 +198,7 @@ public:
     // The default constructor simply stores the message identifier
 
     ApplicationExecutionContext()
-    : JSONTopicMessage( std::string( MessageIdentifier ) )
+    : JSONTopicMessage( std::string( AMQTopic ) )
     {}
 
     // The default destrucor is used
@@ -240,7 +247,7 @@ public:
     static constexpr std::string_view ObjectiveValues = "ObjectiveValues";
     static constexpr std::string_view VariableValues  = "VariableValues";
 
-    static constexpr std::string_view MessageIdentifier 
+    static constexpr std::string_view AMQTopic 
                      = "eu.nebulouscloud.optimiser.solver.solution";
 
     Solution( const TimePointType MicroSecondTimePoint,
@@ -248,7 +255,7 @@ public:
               const ObjectiveValuesType & TheObjectiveValues,
               const VariableValuesType & TheVariables,
               bool DeploySolution )
-    : JSONTopicMessage( std::string( MessageIdentifier ) ,
+    : JSONTopicMessage( std::string( AMQTopic ) ,
       { { std::string( TimeStamp ), MicroSecondTimePoint   },
         { std::string( ObjectiveFunctionLabel ), ObjectiveFunctionID },
         { std::string( ObjectiveValues ) , TheObjectiveValues },
@@ -258,7 +265,7 @@ public:
       {}
     
     Solution()
-    : JSONTopicMessage( std::string( MessageIdentifier ) )
+    : JSONTopicMessage( std::string( AMQTopic ) )
     {}
 
     virtual ~Solution() = default;
@@ -279,15 +286,15 @@ public:
   {
   public:
 
-    static constexpr std::string_view 
-           MessageIdentifier    = "eu.nebulouscloud.optimiser.solver.model";
+    static constexpr std::string_view AMQTopic 
+           = "eu.nebulouscloud.optimiser.controller.model";
 
     OptimisationProblem( const JSON & TheProblem )
-    : JSONTopicMessage( std::string( MessageIdentifier ), TheProblem )
+    : JSONTopicMessage( std::string( AMQTopic ), TheProblem )
     {}
 
     OptimisationProblem()
-    : JSONTopicMessage( std::string( MessageIdentifier ) )
+    : JSONTopicMessage( std::string( AMQTopic ) )
     {}
 
     virtual ~OptimisationProblem() = default;
@@ -326,7 +333,7 @@ public:
 
     Send( Theron::AMQ::NetworkLayer::TopicSubscription(
       Theron::AMQ::NetworkLayer::TopicSubscription::Action::Subscription,
-      Theron::AMQ::TopicName( OptimisationProblem::MessageIdentifier )
+      OptimisationProblem::AMQTopic
     ), GetSessionLayerAddress() );
   }
   
@@ -337,7 +344,7 @@ public:
     if( HasNetwork() )
       Send( Theron::AMQ::NetworkLayer::TopicSubscription(
         Theron::AMQ::NetworkLayer::TopicSubscription::Action::CloseSubscription,
-        Theron::AMQ::TopicName( OptimisationProblem::MessageIdentifier )
+        OptimisationProblem::AMQTopic
       ), GetSessionLayerAddress() );
   }
 };

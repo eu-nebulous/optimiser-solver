@@ -7,8 +7,12 @@
                 "/home/GHo/Documents/Code/CxxOpts/include",
                 "/opt/AMPL/amplapi/include/",
                 "${workspaceFolder}/**",
-                "/usr/lib/gcc/x86_64-redhat-linux/13/../../../../include/c++/13",
-                "/home/GHo/Documents/Code/Theron++"
+                "/home/GHo/Documents/Code/NebulOuS/Solvers",
+                "/usr/include/c++/13",
+                "/home/GHo/Documents/Code/Theron++",
+                "/usr/include/c++/13/x86_64-redhat-linux",
+                "/usr/include/linux",
+                "/usr/include/c++/13/tr1"
             ],
             "defines": [],
             "cStandard": "c23",
@@ -29,7 +33,9 @@
                     "/home/GHo/Documents/Code/Theron++/",
                     "/home/GHo/Documents/Code/CxxOpts/include",
                     "/opt/AMPL/amplapi/include/",
-                    "/usr/lib/gcc/x86_64-redhat-linux/13/../../../../include/c++/13"
+                    "/usr/include/c++/13",
+                    "/usr/include/linux",
+                    "/home/GHo/Documents/Code/NebulOuS/Solvers"
                 ],
                 "limitSymbolsToIncludedHeaders": false
             }
