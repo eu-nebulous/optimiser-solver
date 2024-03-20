@@ -169,31 +169,25 @@ void MetricUpdater::UpdateMetricValue(
 void MetricUpdater::SLOViolationHandler( 
      const SLOViolation & SeverityMessage, const Address TheSLOTopic )
 {
-  // The application execution context is constructed first 
-  // as it represents the name and the current values of the recorded
-  // metrics. 
-
-  Solver::MetricValueType TheApplicationExecutionContext;
-
-  for( const auto & [ MetricName, MetricValue ] : MetricValues )
-    if( !MetricValue.is_null() )
-      TheApplicationExecutionContext.emplace( MetricName, MetricValue );
+  Theron::ConsoleOutput Output;
+  Output << "Metric Updater: SLO violation received " << std::endl
+         << SeverityMessage.dump(2) << std::endl;
 
   // The application context can then be sent to the solution manager 
-  // using the corresponding message, and the time stamp of the severity 
-  // message provided that the size of the execution context equals the 
-  // number of metric values. It will be different if any of the metric 
-  // values has not been updated, and in this case the application execution
-  // context is invalid and cannot be used for optimisation and the 
-  // SLO violation event will just be ignored. Finally, the flag indicating
-  // that the corresponding solution found for this application execution 
-  // context should actually be enacted and deployed.
+  // using the application execution context message provided that none of 
+  // metric values are null indicating that no value has been received (yet)
+  // Thus, only if all metrics have values will the message be sent.
 
-  if( TheApplicationExecutionContext.size() == MetricValues.size() )
+  if( !MetricValues.empty() &&
+      std::ranges::none_of( MetricValues, 
+      [](const auto & MetricRecord){ return MetricRecord.second.is_null(); } ))
     Send( Solver::ApplicationExecutionContext(
       SeverityMessage.at( NebulOuS::TimePoint ).get< Solver::TimePointType >(),
-      TheApplicationExecutionContext, true
+      MetricValues, true
     ), TheSolverManager );
+  else
+    Output << "... failed to forward the application execution context (size: " 
+           << MetricValues.size() << ")" << std::endl;
 }
 
 // --------------------------------------------------------------------------

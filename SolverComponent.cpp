@@ -141,7 +141,7 @@ int main( int NumberOfCLIOptions, char ** CLIOptionStrings )
         cxxopts::value<std::string>()->default_value("NebulOuS::Solver") )
     ("P,Port", "TCP port on  AMQ Broker", 
         cxxopts::value<unsigned int>()->default_value("5672") )
-    ("S,Solver", "Solver to use, devault Couenne",
+    ("S,Solver", "Solver to use, default Couenne",
         cxxopts::value<std::string>()->default_value("couenne") )
     ("U,User", "The user name used for the AMQ Broker connection", 
         cxxopts::value<std::string>()->default_value("admin") )
@@ -257,11 +257,13 @@ int main( int NumberOfCLIOptions, char ** CLIOptionStrings )
     // The application identifier must also be provided in every message to 
     // allow other receivers to filter on this.
 
-    virtual proton::message::property_map 
-    MessageProperties( void ) const override
+    virtual proton::message::property_map MessageProperties( 
+      const proton::message::property_map & CurrentProperties 
+          = proton::message::property_map() ) const override
     {
       proton::message::property_map TheProperties( 
-        Theron::AMQ::NetworkLayer::AMQProperties::MessageProperties() );
+        Theron::AMQ::NetworkLayer::AMQProperties::MessageProperties( 
+          CurrentProperties ));
       
       TheProperties.put( "application", ApplicationID );
 
@@ -288,7 +290,7 @@ int main( int NumberOfCLIOptions, char ** CLIOptionStrings )
   // --------------------------------------------------------------------------
   //
   // The AMQ communication is managed by the standard communication actors of 
-  // the Theron++ Actor framewokr. Thus, it is just a matter of starting the 
+  // the Theron++ Actor framework. Thus, it is just a matter of starting the 
   // endpoint actors with the given command line parameters.
   //
   // The network endpoint takes the endpoint name as the first argument, then 

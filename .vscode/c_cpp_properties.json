@@ -13,7 +13,7 @@
             "defines": [],
             "cStandard": "c23",
             "intelliSenseMode": "linux-gcc-x64",
-            "compilerPath": "/usr/bin/g++",
+            "compilerPath": "/usr/lib64/ccache/g++",
             "compilerArgs": [
                 "-std=c++23",
                 "-I/usr/include/",

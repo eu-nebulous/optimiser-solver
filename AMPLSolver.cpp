@@ -156,6 +156,10 @@ void AMPLSolver::SetAMPLParameter( const std::string & ParameterName,
 void AMPLSolver::DefineProblem(const Solver::OptimisationProblem & TheProblem,
                                const Address TheOracle)
 {
+  Theron::ConsoleOutput Output;
+  Output << "AMPL Solver: Optimisation problem received " << std::endl
+         << TheProblem.dump(2) << std::endl;
+         
   // First storing the AMPL problem file from its definition in the message
   // and read the file back to the AMPL interpreter.
 
@@ -230,6 +234,11 @@ void AMPLSolver::DataFileUpdate( const DataFileMessage & TheDataFile,
 void AMPLSolver::SolveProblem( 
   const ApplicationExecutionContext & TheContext, const Address TheRequester )
 {
+  Theron::ConsoleOutput Output;
+
+  Output << "AMPL Solver: Application Execution Context received. Problem Undefined = " << ProblemUndefined << std::endl
+         << TheContext.dump(2) << std::endl;
+
   // There is nothing to do if the application model is missing.
 
   if( ProblemUndefined ) return;
@@ -339,6 +348,8 @@ void AMPLSolver::SolveProblem(
     OptimisationGoal, ObjectiveValues, VariableValues, 
     DeploymentFlagSet
   ), TheRequester ); 
+
+  Output << "Solver found a solution" << std::endl;
 }
 
 // -----------------------------------------------------------------------------
