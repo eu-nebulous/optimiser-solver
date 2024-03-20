@@ -30,15 +30,23 @@ namespace NebulOuS
 // Subscribing to metric prediction values
 // --------------------------------------------------------------------------
 //
-// The Optimiser controller defines the metric names used in the optimisatoin 
-// model, and the metric subscription will subscribe to these. It is allowed 
-// that the metric list may change during run-time, and therefore the message
-// hadler will make subscriptions for new metrics and remove subscriptions for
-// metrics that are not included in the list, but currently having 
-// subscriptions. 
+// The received message must be a JSON object with metric names as 
+// attribute (keys) and the topic name as the value. Multiple metrics maby be
+// included in the same message and and the andler will iterate and set up a 
+// subcription for each of the provided metrics. It should be noted that 
+// initially the metric has no value, and it is a prerequisite that all 
+// metric values must be updated before the complete set of metrics will be 
+// used for finding a better configuration for the application's execution 
+// context given by the metric values.
+//
+// The message is just considered if the version number of the message is larger
+// than the version of the current set of metrics. The complicating factor is 
+// to deal with metrics that have changed in the case the metric version is 
+// increased. Then new metrics must be subscribed, deleted metrics must be 
+// unsubscribed, and values for kept metrics must be kept.
 
-void MetricUpdater::AddMetricSubscription( 
-     const MetricTopic & MetricDefinitions, const Address OptimiserController )
+void MetricUpdater::AddMetricSubscription( const MetricTopic & TheMetrics,
+                                           const Address OptimiserController )
 {
   JSON TheMetrics = MetricDefinitions.at( MetricTopic::Keys::MetricList );
 
@@ -50,12 +58,12 @@ void MetricUpdater::AddMetricSubscription(
     // some of them may correspond to known metrics, some of them may 
     // correspond to metrics that are new.
 
-    std::set< std::string > TheMetricNames;
+      std::set< std::string > TheMetricNames;
 
-    for (auto & MetricRecord : TheMetrics )
-    {
-      auto [ MetricRecordPointer, MetricAdded ] = MetricValues.try_emplace( 
-             MetricRecord.get<std::string>(), JSON() );
+      for (auto & MetricRecord : TheMetrics.at( NebulOuS::MetricList ) )
+      {
+        auto [ MetricRecordPointer, MetricAdded ] = MetricValues.try_emplace( 
+              MetricRecord.at( NebulOuS::MetricName ).get<std::string>(), JSON() );
 
         TheMetricNames.insert( MetricRecordPointer->first );
 
@@ -71,10 +79,10 @@ void MetricUpdater::AddMetricSubscription(
       }
     }
 
-    // There could be some metric value records that were defined by the
-    // previous metrics defined, but missing from the new metric set. If 
-    // this is the case, the metric value records for the missing metrics
-    // should be unsubcribed and their metric records removed.
+      // There could be some metric value records that were defined by the
+      // previous metrics defined, but missing from the new metric set. If 
+      // this is the case, the metric value records for the missing metrics
+      // should be unsubcribed  and their metric records removed.
 
     for( const auto & TheMetric : std::views::keys( MetricValues ) )
       if( !TheMetricNames.contains( TheMetric ) )
@@ -84,8 +92,9 @@ void MetricUpdater::AddMetricSubscription(
           std::string( MetricValueUpdate::MetricValueRootString ) + TheMetric ), 
           GetSessionLayerAddress() );
 
-        MetricValues.erase( TheMetric );
-      }
+          MetricValues.erase( TheMetric );
+        }
+    }
   }
   else
   {
@@ -94,8 +103,7 @@ void MetricUpdater::AddMetricSubscription(
 
     ErrorMessage << "[" << Location.file_name() << " at line " << Location.line() 
                 << " in function " << Location.function_name() <<"] " 
-                << "The message to define the application's execution context "
-                << "was given as: " << std::endl
+                << "The message to define a new metric subscription is given as "
                 << std::endl << TheMetrics.dump(2) << std::endl
                 << "this is not as expected!";
 
@@ -197,11 +205,8 @@ MetricUpdater::ApplicationLifecycle::operator State() const
 // must look for this identifier type on the solutions in order to decide 
 // which solutions to deploy.
 //
-// The message will be ignored if not all metric values have been received 
-// or if there are no metric values defined. In both cases the SLO violation 
-// message will just be ignored. In order to avoid the scan over all metrics
-// to see if they are set, a boolean flag will be used and set once all metrics
-// have values. Then future scans will be avoided.
+// The message will be ignored if not all metric values have been received, 
+// and no error message indication will be given.
 
 void MetricUpdater::SLOViolationHandler( 
      const SLOViolation & SeverityMessage, const Address TheSLOTopic )
@@ -239,11 +244,7 @@ void MetricUpdater::SLOViolationHandler(
 // The message handlers are registered, and the the updater will then subscribe
 // to the two topics published by the Optimisation Controller: One for the 
 // initial message defining the metrics and the associated topics to subscribe
-// to for their values, and the second to know when a reconfiguration has been 
-// enacted based on a previously sent application execution context. One 
-// subscritpion is also made to receive the SLO violation message indicating 
-// that the running configuration is no longer valid and that a reconfiguration
-// must be made.
+// to for their values, and the second for receiving the SLO violation message.
 
 MetricUpdater::MetricUpdater( const std::string UpdaterName, 
                               const Address ManagerOfSolvers )
