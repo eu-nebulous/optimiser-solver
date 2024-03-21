@@ -67,6 +67,10 @@ void MetricUpdater::AddMetricSubscription( const MetricTopic & TheMetrics,
 
         TheMetricNames.insert( MetricRecordPointer->first );
 
+        // If a new metric was added, a subscription will be set up for this 
+        // new metric, and the flag indicating that values have been received 
+        // for all metrics will be reset.
+
       if( MetricAdded )
       {
         Send( Theron::AMQ::NetworkLayer::TopicSubscription( 
@@ -82,7 +86,7 @@ void MetricUpdater::AddMetricSubscription( const MetricTopic & TheMetrics,
       // There could be some metric value records that were defined by the
       // previous metrics defined, but missing from the new metric set. If 
       // this is the case, the metric value records for the missing metrics
-      // should be unsubcribed  and their metric records removed.
+      // should be unsubcribed and their metric records removed.
 
     for( const auto & TheMetric : std::views::keys( MetricValues ) )
       if( !TheMetricNames.contains( TheMetric ) )
@@ -205,8 +209,11 @@ MetricUpdater::ApplicationLifecycle::operator State() const
 // must look for this identifier type on the solutions in order to decide 
 // which solutions to deploy.
 //
-// The message will be ignored if not all metric values have been received, 
-// and no error message indication will be given.
+// The message will be ignored if not all metric values have been received 
+// or if there are no metric values defined. In both cases the SLO violation 
+// message will just be ignored. In order to avoid the scan over all metrics
+// to see if they are set, a boolean flag will be used and set once all metrics
+// have values. Then future scans will be avoided.
 
 void MetricUpdater::SLOViolationHandler( 
      const SLOViolation & SeverityMessage, const Address TheSLOTopic )
