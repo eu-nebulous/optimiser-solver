@@ -172,6 +172,17 @@ private:
 
   Solver::TimePointType ValidityTime;
 
+  // There is also a flag to indicate when all metric values have received 
+  // values since optimising for a application execution context defiend all 
+  // metrics requires that at least one value is received for each metric. This
+  // condition could be tested before sending the request to find a new 
+  // solution, but this means testing all metrics in a linear scan for a 
+  // condition that will only happen initially until all metrics have been seen
+  // and so it is better for the performance if there is a flag to check for 
+  // this condition.
+
+  bool AllMetricValuesSet;
+
   // When an SLO violation message is received the current vector of metric 
   // values should be sent as an application execution context (message) to the
   // Solution Manager actor that will invoke a solver to find the optimal 

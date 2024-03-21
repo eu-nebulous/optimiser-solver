@@ -68,17 +68,25 @@ void MetricUpdater::AddMetricSubscription( const MetricTopic & TheMetrics,
 
         TheMetricNames.insert( MetricRecordPointer->first );
 
+        // If a new metric was added, a subscription will be set up for this 
+        // new metric, and the flag indicating that values have been received 
+        // for all metrics will be reset.
+
         if( MetricAdded )
+        {
           Send( Theron::AMQ::NetworkLayer::TopicSubscription( 
             Theron::AMQ::NetworkLayer::TopicSubscription::Action::Subscription,
             std::string( MetricValueRootString ) + MetricRecordPointer->first ), 
             GetSessionLayerAddress() );
+
+          AllMetricValuesSet = false;
+        }
       }
 
       // There could be some metric value records that were defined by the
       // previous metrics defined, but missing from the new metric set. If 
       // this is the case, the metric value records for the missing metrics
-      // should be unsubcribed  and their metric records removed.
+      // should be unsubcribed and their metric records removed.
 
       for( const auto & TheMetric : std::views::keys( MetricValues ) )
         if( !TheMetricNames.contains( TheMetric ) )
@@ -163,8 +171,11 @@ void MetricUpdater::UpdateMetricValue(
 // must look for this identifier type on the solutions in order to decide 
 // which solutions to deploy.
 //
-// The message will be ignored if not all metric values have been received, 
-// and no error message indication will be given.
+// The message will be ignored if not all metric values have been received 
+// or if there are no metric values defined. In both cases the SLO violation 
+// message will just be ignored. In order to avoid the scan over all metrics
+// to see if they are set, a boolean flag will be used and set once all metrics
+// have values. Then future scans will be avoided.
 
 void MetricUpdater::SLOViolationHandler( 
      const SLOViolation & SeverityMessage, const Address TheSLOTopic )
@@ -173,13 +184,18 @@ void MetricUpdater::SLOViolationHandler(
   Output << "Metric Updater: SLO violation received " << std::endl
          << SeverityMessage.dump(2) << std::endl;
 
-  if( !MetricValues.empty() &&
-      std::ranges::none_of( MetricValues, 
-      [](const auto & MetricRecord){ return MetricRecord.second.is_null(); } ))
+  if( AllMetricValuesSet || 
+      (!MetricValues.empty() &&
+        std::ranges::none_of( std::views::values( MetricValues ), 
+        [](const auto & MetricValue){ return MetricValue.is_null(); }  )))
+  {
     Send( Solver::ApplicationExecutionContext(
       SeverityMessage.at( NebulOuS::TimePoint ).get< Solver::TimePointType >(),
       MetricValues, true
     ), TheSolverManager );
+
+    AllMetricValuesSet = true;
+  }
   else
     Output << "... failed to forward the application execution context (size: " 
            << MetricValues.size() << ")" << std::endl;
@@ -201,7 +217,8 @@ MetricUpdater::MetricUpdater( const std::string UpdaterName,
 : Actor( UpdaterName ),
   StandardFallbackHandler( Actor::GetAddress().AsString() ),
   NetworkingActor( Actor::GetAddress().AsString() ),
-  MetricValues(), ValidityTime(0), TheSolverManager( ManagerOfSolvers ),
+  MetricValues(), ValidityTime(0), AllMetricValuesSet(false),
+  TheSolverManager( ManagerOfSolvers ),
   MetricsVersion(-1)
 {
   RegisterHandler( this, &MetricUpdater::AddMetricSubscription );
