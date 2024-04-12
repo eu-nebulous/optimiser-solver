@@ -249,7 +249,14 @@ void MetricUpdater::ReconfigurationDone(
      const ReconfigurationMessage & TheReconfiguraton, 
      const Address TheReconfigurationTopic )
 {
+  Theron::ConsoleOutput Output;
+
   ReconfigurationInProgress = false;
+
+  Output << "Reconfiguration ongoing flag reset after receiving the following "
+         << "message indicating that the previous reconfiguration was"
+         << "completed: " << std::endl
+         << TheReconfiguraton.dump(2) << std::endl;
 }
 
 // --------------------------------------------------------------------------
