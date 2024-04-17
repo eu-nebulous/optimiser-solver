@@ -85,21 +85,18 @@ class AMPLSolver
   // Utility methods
   // --------------------------------------------------------------------------
   //
-  // Since both the optimisation problem file and the data file(s) will be sent
-  // as JSON messages with a single key-value pair where the key is the filename
-  // and the value is the file content, there is a common dfinition of the 
-  // problem file directory and a function to read the file. The function will 
-  // throw errors if the JSON message given is not an object, or of there are 
-  // issues opening the file name given. If the file could be successfully 
-  // saved, the functino will close the file and return the file name for 
-  // further processing.
+  // Since both the optimisation problem file and the data file(s) will arrive
+  // as messages containing the file name and the then the content of the file
+  // as a long text string. The following file will open the file for writing
+  // and save the content string to this file.
 
 private:
 
   const std::filesystem::path ProblemFileDirectory;
 
-  std::string SaveFile( const JSON & TheMessage, 
-              const std::source_location  & Location 
+  std::string SaveFile( std::string_view TheName, 
+                        std::string_view TheContent, 
+                        const std::source_location  & Location 
                                           = std::source_location::current() );
 
   // There is also a utility function to look up a named AMPL parameter and 
@@ -130,28 +127,36 @@ protected:
   virtual void DefineProblem( const Solver::OptimisationProblem & TheProblem, 
                               const Address TheOracle ) override;
 
-  // The topic on which the problem file is posted is currently defined as a 
-  // constant string
-
-  static constexpr std::string_view AMPLProblemTopic 
-                   = "eu.nebulouscloud.optimiser.solver.model";
-
   // The JSON message received on this topic is supposed to contain several 
   // keys in the JSON message
   // 1) The filename of the problem file
   // 2) The file content as a single string
-  // 3) The default objective function (defined in the Solver class)
-  // 4) An optional constants section containing constant names as keys
+  // 3) The name of the initial data file
+  // 4) The content of the initial data file as a single string
+  // 5) The default objective function (defined in the Solver class)
+  // 6) An optional constants section containing constant names as keys
   //    and the values will be another map containing the variable 
   //    whose value should be passed to the constant, and the initial 
   //    value of the constant. 
+  // Since these elements are parts of the optimisation problem message
+  // whose class cannot be extended to contain these directly, it is 
+  // necessary to scope these keys differently for the compiler.
 
-  static constexpr std::string_view 
-         FileName             = "FileName",
-         FileContent          = "FileContent",
-         ConstantsLabel       = "Constants",
-         VariableName         = "Variable",
-         InitialConstantValue = "Value";
+  struct OptimisationProblem
+  {
+    struct Keys
+    {
+      static constexpr std::string_view
+        ProblemFile              = "ModelFileName",
+        ProblemDescription       = "ModelFileContent",
+        DataFile                 = "DataFileName",
+        InitialisationData       = "DataFileContent",
+        DefaultObjectiveFunction = "ObjectiveFunction",
+        Constants                = "Constants",
+        VariableName             = "Variable",
+        InitialConstantValue     = "Value";
+    };
+  }; 
 
   // Finally, no solution will be produced unless the problem has been 
   // defined. A flag is therefore set by the message handler indicating 
@@ -193,18 +198,27 @@ public:
   {
   public:
 
-    // The data files are assumed to be published on a dedicated topic for the 
-    // optimiser
+    // The data files are assumed to be published by the performance module 
+    // on a dedicated topic topic for the running solvers.
 
-    static constexpr std::string_view MessageIdentifier 
-                   = "eu.nebulouscloud.optimiser.solver.data";
+    static constexpr std::string_view AMQTopic 
+                   = "eu.nebulouscloud.optimiser.performancemodule.data";
 
+    // The received message will be a mapp supporting the following keys 
+    // basically defining the data file name and its content.
 
-    DataFileMessage( const std::string & TheDataFileName, 
+    struct Keys
+    {
+      static constexpr std::string_view
+        DataFile  = "DataFileName",
+        NewData   = "DataFileContent";
+    };
+
+    DataFileMessage( const std::string_view & TheDataFileName, 
                      const JSON & DataFileContent )
-    : JSONTopicMessage( std::string( MessageIdentifier ), 
-      { { FileName, TheDataFileName }, 
-        { FileContent, DataFileContent } } )
+    : JSONTopicMessage( AMQTopic, 
+      { { Keys::DataFile, TheDataFileName }, 
+        { Keys::NewData, DataFileContent } } )
     {}
 
     DataFileMessage( const DataFileMessage & Other )
@@ -212,7 +226,7 @@ public:
     {}
 
     DataFileMessage()
-    : JSONTopicMessage( std::string( MessageIdentifier ) )
+    : JSONTopicMessage( AMQTopic )
     {}
 
     virtual ~DataFileMessage() = default;

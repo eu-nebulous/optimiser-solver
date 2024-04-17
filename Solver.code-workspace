@@ -1,12 +1,6 @@
 {
 	"folders": [
 		{
-			"path": "../../Theron++"
-		},
-		{
-			"path": "../../Theron++/Examples"
-		},
-		{
 			"path": "."
 		}
 	],
@@ -91,7 +85,8 @@
 			"valarray": "cpp",
 			"bitset": "cpp",
 			"regex": "cpp",
-			"syncstream": "cpp"
+			"syncstream": "cpp",
+			"expected": "cpp"
 		},
 		"gerrit.gitRepo": "/home/GHo/Documents/Code/NebulOuS/Solvers"
 	}

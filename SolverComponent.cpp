@@ -95,6 +95,7 @@ License: MPL2.0 (https://www.mozilla.org/en-US/MPL/2.0/)
 #include "proton/message.hpp"                   // AMQ messages definitions
 #include "proton/source_options.hpp"            // App ID filters
 #include "proton/source.hpp"                    // The filter map
+#include "proton/types.hpp"                     // Type definitions
 #include "Communication/AMQ/AMQMessage.hpp"     // The AMQP messages
 #include "Communication/AMQ/AMQEndpoint.hpp"    // The AMP endpoint
 #include "Communication/AMQ/AMQjson.hpp"        // Transparent JSON-AMQP
@@ -213,8 +214,7 @@ int main( int NumberOfCLIOptions, char ** CLIOptionStrings )
 
     virtual proton::connection_options ConnectionOptions(void) const override
     {
-      proton::connection_options Options( 
-            Theron::AMQ::NetworkLayer::AMQProperties::ConnectionOptions() );
+      proton::connection_options Options( AMQProperties::ConnectionOptions() );
 
       Options.user( User );
       Options.password( Password );
@@ -235,8 +235,7 @@ int main( int NumberOfCLIOptions, char ** CLIOptionStrings )
       proton::symbol             FilterKey("selector");
       proton::value              FilterValue;
       proton::codec::encoder     EncodedFilter( FilterValue );
-      proton::receiver_options   TheOptions( 
-              Theron::AMQ::NetworkLayer::AMQProperties::ReceiverOptions() );
+      proton::receiver_options   TheOptions( AMQProperties::ReceiverOptions() );
 
       std::ostringstream SelectorString;
 
@@ -255,17 +254,18 @@ int main( int NumberOfCLIOptions, char ** CLIOptionStrings )
     }
 
     // The application identifier must also be provided in every message to 
-    // allow other receivers to filter on this.
+    // allow other receivers to filter on this. First will the default 
+    // properties from the base class be set before the new application 
+    // identifier property will be added.
 
-    virtual proton::message::property_map MessageProperties( 
+    virtual std::map<std::string, proton::scalar> MessageProperties( 
       const proton::message::property_map & CurrentProperties 
           = proton::message::property_map() ) const override
     {
-      proton::message::property_map TheProperties( 
-        Theron::AMQ::NetworkLayer::AMQProperties::MessageProperties( 
-          CurrentProperties ));
-      
-      TheProperties.put( "application", ApplicationID );
+      std::map<std::string, proton::scalar> 
+      TheProperties( AMQProperties::MessageProperties( CurrentProperties ) );
+
+      TheProperties["application"] = ApplicationID;
 
       return TheProperties;
     }
@@ -332,8 +332,8 @@ int main( int NumberOfCLIOptions, char ** CLIOptionStrings )
 
   NebulOuS::SolverManager< NebulOuS::AMPLSolver > 
   WorkloadMabager( CLIValues["Name"].as<std::string>(), 
-    std::string( NebulOuS::Solver::Solution::MessageIdentifier ), 
-    std::string( NebulOuS::Solver::ApplicationExecutionContext::MessageIdentifier ),
+    NebulOuS::Solver::Solution::AMQTopic, 
+    NebulOuS::Solver::ApplicationExecutionContext::AMQTopic,
     1, "AMPLSolver", 
     ampl::Environment( TheAMPLDirectory.native() ), ModelDirectory, 
     CLIValues["Solver"].as<std::string>() );

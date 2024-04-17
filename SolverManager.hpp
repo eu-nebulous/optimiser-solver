@@ -174,7 +174,8 @@ private:
     const Address TheRequester )
   {
     ContextQueue.emplace( 
-      TheContext.at( Solver::TimeStamp ).get< Solver::TimePointType >(), 
+      TheContext.at( Solver::ApplicationExecutionContext::Keys::TimeStamp 
+                   ).get< Solver::TimePointType >(), 
       TheContext );
 
     DispatchToSolvers();
@@ -193,7 +194,7 @@ private:
   void PublishSolution( const Solver::Solution & TheSolution, 
                         const Address TheSolver )
   {
-    Send( TheSolution, SolutionReceiver );
+    Send( TheSolution, Address( SolutionReceiver ) );
     PassiveSolvers.insert( ActiveSolvers.extract( TheSolver ) );
     DispatchToSolvers();
   }
@@ -274,7 +275,7 @@ public:
 
       Send( ExecutionControl::StatusMessage(
         ExecutionControl::StatusMessage::State::Started
-      ), Address( std::string( ExecutionControl::StatusTopic ) ) );
+      ), Address( ExecutionControl::StatusMessage::AMQTopic ) );
     }
     else
     {

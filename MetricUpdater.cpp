@@ -30,41 +30,32 @@ namespace NebulOuS
 // Subscribing to metric prediction values
 // --------------------------------------------------------------------------
 //
-// The received message must be a JSON object with metric names as 
-// attribute (keys) and the topic name as the value. Multiple metrics maby be
-// included in the same message and and the andler will iterate and set up a 
-// subcription for each of the provided metrics. It should be noted that 
-// initially the metric has no value, and it is a prerequisite that all 
-// metric values must be updated before the complete set of metrics will be 
-// used for finding a better configuration for the application's execution 
-// context given by the metric values.
-//
-// The message is just considered if the version number of the message is larger
-// than the version of the current set of metrics. The complicating factor is 
-// to deal with metrics that have changed in the case the metric version is 
-// increased. Then new metrics must be subscribed, deleted metrics must be 
-// unsubscribed, and values for kept metrics must be kept.
+// The Optimiser controller defines the metric names used in the optimisatoin 
+// model, and the metric subscription will subscribe to these. It is allowed 
+// that the metric list may change during run-time, and therefore the message
+// hadler will make subscriptions for new metrics and remove subscriptions for
+// metrics that are not included in the list, but currently having 
+// subscriptions. 
 
-void MetricUpdater::AddMetricSubscription( const MetricTopic & TheMetrics,
-                                           const Address OptimiserController )
+void MetricUpdater::AddMetricSubscription( 
+     const MetricTopic & MetricDefinitions, const Address OptimiserController )
 {
-  if( TheMetrics.is_object() && 
-      TheMetrics.at( NebulOuS::MetricList ).is_array() )
+  JSON TheMetrics = MetricDefinitions.at( MetricTopic::Keys::MetricList );
+
+  if( TheMetrics.is_array() )
   {
-    if( MetricsVersion < TheMetrics.at( MetricVersionCounter ).get<long int>() )
+    // The first step is to try inserting the metrics into the metric value 
+    // map and if this is successful, a subscription is created for the 
+    // publisherof this metric value. The metric names are recorded since 
+    // some of them may correspond to known metrics, some of them may 
+    // correspond to metrics that are new.
+
+    std::set< std::string > TheMetricNames;
+
+    for (auto & MetricRecord : TheMetrics )
     {
-      // The first step is to try inserting the metrics into the metric value 
-      // map and if this is successful, a subscription is created for the 
-      // publisherof this metric value. The metric names are recorded since 
-      // some of them may correspond to known metrics, some of them may 
-      // correspond to metrics that are new.
-
-      std::set< std::string > TheMetricNames;
-
-      for (auto & MetricRecord : TheMetrics.at( NebulOuS::MetricList ) )
-      {
-        auto [ MetricRecordPointer, MetricAdded ] = MetricValues.try_emplace( 
-              MetricRecord.at( NebulOuS::MetricName ).get<std::string>(), JSON() );
+      auto [ MetricRecordPointer, MetricAdded ] = MetricValues.try_emplace( 
+             MetricRecord.get<std::string>(), JSON() );
 
         TheMetricNames.insert( MetricRecordPointer->first );
 
@@ -72,33 +63,33 @@ void MetricUpdater::AddMetricSubscription( const MetricTopic & TheMetrics,
         // new metric, and the flag indicating that values have been received 
         // for all metrics will be reset.
 
-        if( MetricAdded )
-        {
-          Send( Theron::AMQ::NetworkLayer::TopicSubscription( 
-            Theron::AMQ::NetworkLayer::TopicSubscription::Action::Subscription,
-            std::string( MetricValueRootString ) + MetricRecordPointer->first ), 
-            GetSessionLayerAddress() );
+      if( MetricAdded )
+      {
+        Send( Theron::AMQ::NetworkLayer::TopicSubscription( 
+          Theron::AMQ::NetworkLayer::TopicSubscription::Action::Subscription,
+          std::string( MetricValueUpdate::MetricValueRootString ) 
+                       + MetricRecordPointer->first ), 
+          GetSessionLayerAddress() );
 
-          AllMetricValuesSet = false;
-        }
+        AllMetricValuesSet = false;
       }
-
-      // There could be some metric value records that were defined by the
-      // previous metrics defined, but missing from the new metric set. If 
-      // this is the case, the metric value records for the missing metrics
-      // should be unsubcribed and their metric records removed.
-
-      for( const auto & TheMetric : std::views::keys( MetricValues ) )
-        if( !TheMetricNames.contains( TheMetric ) )
-        {
-          Send( Theron::AMQ::NetworkLayer::TopicSubscription( 
-            Theron::AMQ::NetworkLayer::TopicSubscription::Action::CloseSubscription,
-            std::string( MetricValueRootString ) + TheMetric ), 
-            GetSessionLayerAddress() );
-
-          MetricValues.erase( TheMetric );
-        }
     }
+
+    // There could be some metric value records that were defined by the
+    // previous metrics defined, but missing from the new metric set. If 
+    // this is the case, the metric value records for the missing metrics
+    // should be unsubcribed and their metric records removed.
+
+    for( const auto & TheMetric : std::views::keys( MetricValues ) )
+      if( !TheMetricNames.contains( TheMetric ) )
+      {
+        Send( Theron::AMQ::NetworkLayer::TopicSubscription( 
+          Theron::AMQ::NetworkLayer::TopicSubscription::Action::CloseSubscription,
+          std::string( MetricValueUpdate::MetricValueRootString ) + TheMetric ), 
+          GetSessionLayerAddress() );
+
+        MetricValues.erase( TheMetric );
+      }
   }
   else
   {
@@ -107,7 +98,8 @@ void MetricUpdater::AddMetricSubscription( const MetricTopic & TheMetrics,
 
     ErrorMessage << "[" << Location.file_name() << " at line " << Location.line() 
                 << " in function " << Location.function_name() <<"] " 
-                << "The message to define a new metric subscription is given as "
+                << "The message to define the application's execution context "
+                << "was given as: " << std::endl
                 << std::endl << TheMetrics.dump(2) << std::endl
                 << "this is not as expected!";
 
@@ -146,14 +138,16 @@ void MetricUpdater::UpdateMetricValue(
 {
   Theron::AMQ::TopicName TheTopic 
           = TheMetricTopic.AsString().erase( 0, 
-                                      NebulOuS::MetricValueRootString.size() );
+                           MetricValueUpdate::MetricValueRootString.size() );
 
   if( MetricValues.contains( TheTopic ) )
   {
-    MetricValues.at( TheTopic ) = TheMetricValue.at( NebulOuS::ValueLabel );
+    MetricValues.at( TheTopic ) 
+      = TheMetricValue.at( MetricValueUpdate::Keys::ValueLabel );
     
     ValidityTime = std::max( ValidityTime, 
-      TheMetricValue.at( NebulOuS::TimePoint ).get< Solver::TimePointType >() );
+      TheMetricValue.at( 
+        MetricValueUpdate::Keys::TimePoint ).get< Solver::TimePointType >() );
   }
 }
 
@@ -176,6 +170,11 @@ void MetricUpdater::UpdateMetricValue(
 // message will just be ignored. In order to avoid the scan over all metrics
 // to see if they are set, a boolean flag will be used and set once all metrics
 // have values. Then future scans will be avoided.
+// The message will be ignored if not all metric values have been received 
+// or if there are no metric values defined. In both cases the SLO violation 
+// message will just be ignored. In order to avoid the scan over all metrics
+// to see if they are set, a boolean flag will be used and set once all metrics
+// have values. Then future scans will be avoided.
 
 void MetricUpdater::SLOViolationHandler( 
      const SLOViolation & SeverityMessage, const Address TheSLOTopic )
@@ -184,21 +183,48 @@ void MetricUpdater::SLOViolationHandler(
   Output << "Metric Updater: SLO violation received " << std::endl
          << SeverityMessage.dump(2) << std::endl;
 
-  if( AllMetricValuesSet || 
+  if( !ReconfigurationInProgress && 
+     ( AllMetricValuesSet || 
       (!MetricValues.empty() &&
         std::ranges::none_of( std::views::values( MetricValues ), 
-        [](const auto & MetricValue){ return MetricValue.is_null(); }  )))
+        [](const auto & MetricValue){ return MetricValue.is_null(); }  ))) )
   {
     Send( Solver::ApplicationExecutionContext(
-      SeverityMessage.at( NebulOuS::TimePoint ).get< Solver::TimePointType >(),
+      SeverityMessage.at( 
+        MetricValueUpdate::Keys::TimePoint ).get< Solver::TimePointType >(),
       MetricValues, true
     ), TheSolverManager );
 
-    AllMetricValuesSet = true;
+    AllMetricValuesSet        = true;
+    ReconfigurationInProgress = true;
   }
   else
     Output << "... failed to forward the application execution context (size: " 
            << MetricValues.size() << ")" << std::endl;
+}
+
+// --------------------------------------------------------------------------
+// Reconfigured application
+// --------------------------------------------------------------------------
+//
+// When the reconfiguration message is received it is an indication tha the 
+// Optimiser Controller has reconfigured the application and that the 
+// application is running in the new configuration found by the solver. 
+// It is the event that is important m not the content of the message, and 
+// it is therefore only used to reset the ongoing reconfiguration flag.
+
+void MetricUpdater::ReconfigurationDone( 
+     const ReconfigurationMessage & TheReconfiguraton, 
+     const Address TheReconfigurationTopic )
+{
+  Theron::ConsoleOutput Output;
+
+  ReconfigurationInProgress = false;
+
+  Output << "Reconfiguration ongoing flag reset after receiving the following "
+         << "message indicating that the previous reconfiguration was"
+         << "completed: " << std::endl
+         << TheReconfiguraton.dump(2) << std::endl;
 }
 
 // --------------------------------------------------------------------------
@@ -210,7 +236,11 @@ void MetricUpdater::SLOViolationHandler(
 // The message handlers are registered, and the the updater will then subscribe
 // to the two topics published by the Optimisation Controller: One for the 
 // initial message defining the metrics and the associated topics to subscribe
-// to for their values, and the second for receiving the SLO violation message.
+// to for their values, and the second to know when a reconfiguration has been 
+// enacted based on a previously sent application execution context. One 
+// subscritpion is also made to receive the SLO violation message indicating 
+// that the running configuration is no longer valid and that a reconfiguration
+// must be made.
 
 MetricUpdater::MetricUpdater( const std::string UpdaterName, 
                               const Address ManagerOfSolvers )
@@ -219,20 +249,26 @@ MetricUpdater::MetricUpdater( const std::string UpdaterName,
   NetworkingActor( Actor::GetAddress().AsString() ),
   MetricValues(), ValidityTime(0), AllMetricValuesSet(false),
   TheSolverManager( ManagerOfSolvers ),
-  MetricsVersion(-1)
+  ReconfigurationInProgress( false )
 {
   RegisterHandler( this, &MetricUpdater::AddMetricSubscription );
   RegisterHandler( this, &MetricUpdater::UpdateMetricValue     );
   RegisterHandler( this, &MetricUpdater::SLOViolationHandler   );
+  RegisterHandler( this, &MetricUpdater::ReconfigurationDone   );
 
   Send( Theron::AMQ::NetworkLayer::TopicSubscription(
     Theron::AMQ::NetworkLayer::TopicSubscription::Action::Subscription,
-    std::string( NebulOuS::MetricSubscriptions ) ), 
+    MetricTopic::AMQTopic ), 
     GetSessionLayerAddress() );
 
   Send( Theron::AMQ::NetworkLayer::TopicSubscription(
     Theron::AMQ::NetworkLayer::TopicSubscription::Action::Subscription,
-    std::string( NebulOuS::SLOViolationTopic ) ), 
+    ReconfigurationMessage::AMQTopic ), 
+    GetSessionLayerAddress() );
+
+  Send( Theron::AMQ::NetworkLayer::TopicSubscription(
+    Theron::AMQ::NetworkLayer::TopicSubscription::Action::Subscription,
+    SLOViolation::AMQTopic ), 
     GetSessionLayerAddress() ); 
 }
 
@@ -247,19 +283,25 @@ MetricUpdater::~MetricUpdater()
   {
     Send( Theron::AMQ::NetworkLayer::TopicSubscription(
       Theron::AMQ::NetworkLayer::TopicSubscription::Action::CloseSubscription,
-      std::string( NebulOuS::MetricSubscriptions ) ), 
+      MetricTopic::AMQTopic ), 
       GetSessionLayerAddress() );
 
     Send( Theron::AMQ::NetworkLayer::TopicSubscription(
       Theron::AMQ::NetworkLayer::TopicSubscription::Action::CloseSubscription,
-      std::string( NebulOuS::SLOViolationTopic ) ), 
+      ReconfigurationMessage::AMQTopic ), 
+      GetSessionLayerAddress() );
+
+    Send( Theron::AMQ::NetworkLayer::TopicSubscription(
+      Theron::AMQ::NetworkLayer::TopicSubscription::Action::CloseSubscription,
+      SLOViolation::AMQTopic ), 
       GetSessionLayerAddress() );  
 
     std::ranges::for_each( std::views::keys( MetricValues ),
     [this]( const Theron::AMQ::TopicName & TheMetricTopic ){
       Send( Theron::AMQ::NetworkLayer::TopicSubscription(
         Theron::AMQ::NetworkLayer::TopicSubscription::Action::CloseSubscription,
-        std::string( MetricValueRootString ) + TheMetricTopic ), 
+        std::string( MetricValueUpdate::MetricValueRootString ) 
+                     + TheMetricTopic ), 
         GetSessionLayerAddress() );
     });
   }
