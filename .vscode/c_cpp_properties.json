@@ -3,9 +3,9 @@
         {
             "name": "Linux",
             "includePath": [
-                "/home/GHo/Documents/Code/Theron++/",
+                "/home/GHo/Documents/Code/Theron++",
                 "/home/GHo/Documents/Code/CxxOpts/include",
-                "/opt/AMPL/amplapi/include/",
+                "/opt/AMPL/amplapi/include",
                 "${workspaceFolder}/**",
                 "/home/GHo/Documents/Code/NebulOuS/Solvers",
                 "/usr/include/c++/13",
@@ -30,15 +30,14 @@
             "configurationProvider": "ms-vscode.makefile-tools",
             "browse": {
                 "path": [
-                    "/home/GHo/Documents/Code/Theron++/",
+                    "/home/GHo/Documents/Code/Theron++",
                     "/home/GHo/Documents/Code/CxxOpts/include",
-                    "/opt/AMPL/amplapi/include/",
+                    "/opt/AMPL/amplapi/include",
                     "/usr/include/c++/13",
                     "/usr/include/linux",
-                    "/home/GHo/Documents/Code/NebulOuS/Solvers",
-                    "."
+                    "/home/GHo/Documents/Code/NebulOuS/Solvers"
                 ],
-                "limitSymbolsToIncludedHeaders": false
+                "limitSymbolsToIncludedHeaders": true
             }
         }
     ],
