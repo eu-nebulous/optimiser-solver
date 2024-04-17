@@ -35,10 +35,10 @@ namespace NebulOuS
 // that the metric list may change during run-time, and therefore the message
 // hadler will make subscriptions for new metrics and remove subscriptions for
 // metrics that are not included in the list, but currently having 
-// subscriptions
+// subscriptions. 
 
-void MetricUpdater::AddMetricSubscription( const MetricTopic & TheMetrics,
-                                           const Address OptimiserController )
+void MetricUpdater::AddMetricSubscription( 
+     const MetricTopic & MetricDefinitions, const Address OptimiserController )
 {
   JSON TheMetrics = MetricDefinitions.at( MetricTopic::Keys::MetricList );
 
