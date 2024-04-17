@@ -31,50 +31,30 @@ namespace NebulOuS
 // is received updating AMPL model parameters. Hence the common file creation
 // is taken care of by a dedicated function.
 
-std::string AMPLSolver::SaveFile( const JSON & TheMessage, 
+std::string AMPLSolver::SaveFile( std::string_view TheName, 
+                                  std::string_view TheContent,
                                   const std::source_location & Location )
 {
-  if( TheMessage.is_object() )
+  std::string TheFileName = ProblemFileDirectory / TheName;
+
+  std::fstream TheFile( TheFileName, std::ios::out | std::ios::binary );
+                      
+  if( TheFile.is_open() )
   {
-    std::string TheFileName 
-                = ProblemFileDirectory / TheMessage.at( AMPLSolver::FileName );
-
-    std::fstream ProblemFile( TheFileName, std::ios::out | std::ios::binary );
-                        
-    if( ProblemFile.is_open() )
-    {
-      ProblemFile << TheMessage.at( AMPLSolver::FileContent ).get<std::string>();
-      ProblemFile.close();
-      return TheFileName;
-    }
-    else
-    {
-      std::source_location Location = std::source_location::current();
-      std::ostringstream ErrorMessage;
-
-      ErrorMessage << "[" << Location.file_name() << " at line " 
-                  << Location.line()
-                  << "in function " << Location.function_name() <<"] " 
-                  << "The AMPL file at "
-                  << TheFileName
-                  << " could not be opened for output!";
-
-      throw std::system_error( static_cast< int >( std::errc::io_error ),
-                               std::system_category(), ErrorMessage.str() );
-    }
+    TheFile << TheContent;
+    TheFile.close();
+    return TheFileName;
   }
   else
   {
-    std::source_location Location = std::source_location::current();
     std::ostringstream ErrorMessage;
 
     ErrorMessage << "[" << Location.file_name() << " at line " 
                 << Location.line()
                 << "in function " << Location.function_name() <<"] " 
-                << "The JSON message is not an object. The received "
-                << "message is " << std::endl
-                << TheMessage.dump(2)
-                << std::endl;
+                << "The AMPL file at "
+                << TheFileName
+                << " could not be opened for output!";
 
     throw std::system_error( static_cast< int >( std::errc::io_error ),
                               std::system_category(), ErrorMessage.str() );
@@ -163,13 +143,18 @@ void AMPLSolver::DefineProblem(const Solver::OptimisationProblem & TheProblem,
   // First storing the AMPL problem file from its definition in the message
   // and read the file back to the AMPL interpreter.
 
-  ProblemDefinition.read( SaveFile( TheProblem ) );
+  ProblemDefinition.read( SaveFile( 
+    TheProblem.at( 
+      OptimisationProblem::Keys::ProblemFile ).get< std::string >() ,
+    TheProblem.at( 
+      OptimisationProblem::Keys::ProblemDescription ).get< std::string >() ) );
 
   // The next is to read the label of the default objective function and 
   // store this. An invalid argument exception is thrown if the field is missing
 
-  if( TheProblem.contains( Solver::ObjectiveFunctionLabel ) )
-    DefaultObjectiveFunction = TheProblem.at( Solver::ObjectiveFunctionLabel );
+  if( TheProblem.contains(OptimisationProblem::Keys::DefaultObjectiveFunction) )
+    DefaultObjectiveFunction 
+      = TheProblem.at( OptimisationProblem::Keys::DefaultObjectiveFunction );
   else
   {
     std::source_location Location = std::source_location::current();
@@ -180,24 +165,48 @@ void AMPLSolver::DefineProblem(const Solver::OptimisationProblem & TheProblem,
                   << "in function " << Location.function_name() <<"] " 
                   << "The problem definition must contain a default objective "
                   << "function under the key [" 
-                  << Solver::ObjectiveFunctionLabel
+                  << OptimisationProblem::Keys::DefaultObjectiveFunction
                   << "]" << std::endl;
 
     throw std::invalid_argument( ErrorMessage.str() );
   }
 
-  // After all the manatory fields have been processed, the set of constants 
-  // will be processed storing the mapping from variable value to constant.
+  // The default values for the data will be loaded from the data file. This
+  // operation is the same as the one done for data messages, and to avoid 
+  // code duplication the handler is just invoked using the address of this
+  // solver Actor as the the sender is not important for this update. However,
+  // if the information is missing from the message, no data file should be 
+  // loaded. It is necessary to convert the content to a string since the 
+  // JSON library only sees the string and not its length before it has been 
+  // unwrapped.
 
-  if( TheProblem.contains( ConstantsLabel ) &&
-      TheProblem.at( ConstantsLabel ).is_object() )
+  if( TheProblem.contains( DataFileMessage::Keys::DataFile ) && 
+      TheProblem.contains( DataFileMessage::Keys::NewData  )      )
+  {
+    std::string FileContent 
+        = TheProblem.at( DataFileMessage::Keys::NewData ).get< std::string >();
+
+    if( !FileContent.empty() )
+        DataFileUpdate( DataFileMessage(
+          TheProblem.at( DataFileMessage::Keys::DataFile ).get< std::string >(),
+          FileContent ), 
+          GetAddress() );
+  }
+
+  // The set of constants will be processed storing the mapping from a variable
+  // value to a constant.
+
+  if( TheProblem.contains( OptimisationProblem::Keys::Constants ) &&
+      TheProblem.at( OptimisationProblem::Keys::Constants ).is_object() )
     for( const auto & [ ConstantName, ConstantRecord ] :
-                      TheProblem.at( ConstantsLabel ).items() )
+         TheProblem.at( OptimisationProblem::Keys::Constants ).items() )
     {
-      VariablesToConstants.emplace( ConstantRecord.at( VariableName ), 
-                                    ConstantName );
+      VariablesToConstants.emplace( 
+        ConstantRecord.at( OptimisationProblem::Keys::VariableName ), 
+        ConstantName );
+
       SetAMPLParameter( ConstantName, 
-                        ConstantRecord.at( InitialConstantValue ) );
+        ConstantRecord.at( OptimisationProblem::Keys::InitialConstantValue ) );
     }
 
   // Finally, the problem has been defined and the flag is set to allow 
@@ -215,10 +224,12 @@ void AMPLSolver::DefineProblem(const Solver::OptimisationProblem & TheProblem,
 // the Define Problem message handler: The save file is used to store the 
 // received file, which is then loaded as the data problem.
 
-void AMPLSolver::DataFileUpdate( const DataFileMessage & TheDataFile, 
+void AMPLSolver::DataFileUpdate( const DataFileMessage & NewData, 
                                  const Address TheOracle )
 {
-  ProblemDefinition.readData( SaveFile( TheDataFile ) );
+  ProblemDefinition.readData( SaveFile( 
+    NewData.at( DataFileMessage::Keys::DataFile ).get< std::string >(),
+    NewData.at( DataFileMessage::Keys::NewData  ).get< std::string >() ) );
 }
 
 // -----------------------------------------------------------------------------
@@ -248,7 +259,8 @@ void AMPLSolver::SolveProblem(
   // supported as values.
 
   for( const auto & [ TheName, MetricValue ] : 
-       Solver::MetricValueType( TheContext.at( Solver::ExecutionContext ) ) )
+       Solver::MetricValueType( TheContext.at( 
+       Solver::ApplicationExecutionContext::Keys::ExecutionContext ) ) )
     SetAMPLParameter( TheName, MetricValue );
 
   // Setting the given objective as the active objective and all other
@@ -257,8 +269,10 @@ void AMPLSolver::SolveProblem(
 
   std::string OptimisationGoal;
 
-  if( TheContext.contains( Solver::ObjectiveFunctionLabel ) )
-    OptimisationGoal = TheContext.at( Solver::ObjectiveFunctionLabel );
+  if( TheContext.contains( 
+      Solver::ApplicationExecutionContext::Keys::ObjectiveFunctionLabel ) )
+    OptimisationGoal = TheContext.at( 
+      Solver::ApplicationExecutionContext::Keys::ObjectiveFunctionLabel );
   else if( !DefaultObjectiveFunction.empty() )
     OptimisationGoal = DefaultObjectiveFunction;
   else
@@ -330,7 +344,8 @@ void AMPLSolver::SolveProblem(
   // application execution context has the deployment flag set.
 
   Solver::Solution::VariableValuesType VariableValues;
-  bool DeploymentFlagSet = TheContext.at( DeploymentFlag ).get<bool>();
+  bool DeploymentFlagSet 
+       = TheContext.at( Solver::Solution::Keys::DeploymentFlag ).get<bool>();
 
   for( auto Variable : ProblemDefinition.getVariables() )
   {
@@ -343,8 +358,9 @@ void AMPLSolver::SolveProblem(
 
   // The found solution can then be returned to the requesting actor or topic
 
-  Send( Solver::Solution(
-    TheContext.at( Solver::TimeStamp ).get< Solver::TimePointType >(),
+  Send( Solver::Solution( 
+    TheContext.at( 
+      Solver::Solution::Keys::TimeStamp ).get< Solver::TimePointType >(),
     OptimisationGoal, ObjectiveValues, VariableValues, 
     DeploymentFlagSet
   ), TheRequester ); 
@@ -385,7 +401,7 @@ AMPLSolver::AMPLSolver( const std::string & TheActorName,
 
   Send( Theron::AMQ::NetworkLayer::TopicSubscription(
     Theron::AMQ::NetworkLayer::TopicSubscription::Action::Subscription,
-    Theron::AMQ::TopicName( DataFileMessage::MessageIdentifier )
+    DataFileMessage::AMQTopic
   ), GetSessionLayerAddress() );
 }
 
@@ -397,7 +413,7 @@ AMPLSolver::~AMPLSolver()
   if( HasNetwork() )
     Send( Theron::AMQ::NetworkLayer::TopicSubscription(
       Theron::AMQ::NetworkLayer::TopicSubscription::Action::CloseSubscription,
-      Theron::AMQ::TopicName( DataFileMessage::MessageIdentifier )
+      DataFileMessage::AMQTopic
     ), GetSessionLayerAddress() );
 }
 

@@ -58,7 +58,7 @@ void ExecutionControl::StopMessageHandler( const StopMessage & Command,
   std::lock_guard< std::mutex > Lock( TerminationLock );
 
   Send( StatusMessage( StatusMessage::State::Stopped ), 
-                       Address( std::string( StatusTopic ) ) );
+                       Address( StatusMessage::AMQTopic ) );
 
   Send( Theron::Network::ShutDown(), 
         Theron::Network::GetAddress( Theron::Network::Layer::Session ) );
@@ -83,11 +83,11 @@ ExecutionControl::ExecutionControl( const std::string & TheActorName )
 
   Send( Theron::AMQ::NetworkLayer::TopicSubscription(
     Theron::AMQ::NetworkLayer::TopicSubscription::Action::Publisher,
-    std::string( StatusTopic )
+    StatusMessage::AMQTopic
   ), GetSessionLayerAddress() );
 
   Send( StatusMessage( StatusMessage::State::Starting ), 
-        Address( std::string( StatusTopic ) ) );
+        Address( StatusMessage::AMQTopic ) );
 
 }
 
@@ -99,7 +99,7 @@ ExecutionControl::~ExecutionControl( void )
   if( HasNetwork() )
     Send( Theron::AMQ::NetworkLayer::TopicSubscription(
       Theron::AMQ::NetworkLayer::TopicSubscription::Action::ClosePublisher,
-      std::string( StatusTopic )
+      StatusMessage::AMQTopic
     ), GetSessionLayerAddress() );
 }
 

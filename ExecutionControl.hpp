@@ -110,18 +110,19 @@ protected:
 
   public:
 
+    // The status of the solver is communicated on the dedicated status topic
+
+    static constexpr std::string_view AMQTopic 
+                                      = "eu.nebulouscloud.solver.state";
+
+
     StatusMessage( State TheSituation, 
                    std::string AdditionalInformation = std::string() )
-    : JSONMessage( std::string( StatusTopic ),
+    : JSONMessage(  StatusMessage::AMQTopic,
                    { {"when", UTCNow() }, {"state", ToString( TheSituation ) },
                      {"message", AdditionalInformation } } )
     {}
   };
-
-  // The status of the solver is communicated on the dedicated status topic
-
-  static constexpr std::string_view StatusTopic 
-                                     = "eu.nebulouscloud.solver.state";
 
 public:
 
