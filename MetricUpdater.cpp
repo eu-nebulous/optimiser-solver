@@ -35,11 +35,13 @@ namespace NebulOuS
 // that the metric list may change during run-time, and therefore the message
 // hadler will make subscriptions for new metrics and remove subscriptions for
 // metrics that are not included in the list, but currently having 
-// subscriptions
+// subscriptions. 
 
-void MetricUpdater::AddMetricSubscription( const MetricTopic & TheMetrics,
-                                           const Address OptimiserController )
+void MetricUpdater::AddMetricSubscription( 
+     const MetricTopic & MetricDefinitions, const Address OptimiserController )
 {
+  JSON TheMetrics = MetricDefinitions.at( MetricList );
+
   if( TheMetrics.is_array() )
   {
     // The first step is to try inserting the metrics into the metric value 
@@ -248,17 +250,17 @@ MetricUpdater::MetricUpdater( const std::string UpdaterName,
 
   Send( Theron::AMQ::NetworkLayer::TopicSubscription(
     Theron::AMQ::NetworkLayer::TopicSubscription::Action::Subscription,
-    std::string( NebulOuS::MetricSubscriptions ) ), 
+    NebulOuS::MetricSubscriptions ), 
     GetSessionLayerAddress() );
 
   Send( Theron::AMQ::NetworkLayer::TopicSubscription(
     Theron::AMQ::NetworkLayer::TopicSubscription::Action::Subscription,
-    std::string( NebulOuS::ReconfigurationTopic ) ), 
+    NebulOuS::ReconfigurationTopic ), 
     GetSessionLayerAddress() );
 
   Send( Theron::AMQ::NetworkLayer::TopicSubscription(
     Theron::AMQ::NetworkLayer::TopicSubscription::Action::Subscription,
-    std::string( NebulOuS::SLOViolationTopic ) ), 
+    NebulOuS::SLOViolationTopic ), 
     GetSessionLayerAddress() ); 
 }
 
@@ -273,17 +275,17 @@ MetricUpdater::~MetricUpdater()
   {
     Send( Theron::AMQ::NetworkLayer::TopicSubscription(
       Theron::AMQ::NetworkLayer::TopicSubscription::Action::CloseSubscription,
-      std::string( NebulOuS::MetricSubscriptions ) ), 
+      NebulOuS::MetricSubscriptions ), 
       GetSessionLayerAddress() );
 
     Send( Theron::AMQ::NetworkLayer::TopicSubscription(
       Theron::AMQ::NetworkLayer::TopicSubscription::Action::CloseSubscription,
-      std::string( NebulOuS::ReconfigurationTopic ) ), 
+      NebulOuS::ReconfigurationTopic ), 
       GetSessionLayerAddress() );
 
     Send( Theron::AMQ::NetworkLayer::TopicSubscription(
       Theron::AMQ::NetworkLayer::TopicSubscription::Action::CloseSubscription,
-      std::string( NebulOuS::SLOViolationTopic ) ), 
+      NebulOuS::SLOViolationTopic ), 
       GetSessionLayerAddress() );  
 
     std::ranges::for_each( std::views::keys( MetricValues ),
