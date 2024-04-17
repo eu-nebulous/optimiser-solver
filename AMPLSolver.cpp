@@ -174,7 +174,11 @@ void AMPLSolver::DefineProblem(const Solver::OptimisationProblem & TheProblem,
   // The default values for the data will be loaded from the data file. This
   // operation is the same as the one done for data messages, and to avoid 
   // code duplication the handler is just invoked using the address of this
-  // solver Actor as the the sender is not important for this update.
+  // solver Actor as the the sender is not important for this update. However,
+  // if the information is missing from the message, no data file should be 
+  // loaded. It is necessary to convert the content to a string since the 
+  // JSON library only sees the string and not its length before it has been 
+  // unwrapped.
 
   if( TheProblem.contains( DataFileMessage::Keys::DataFile ) && 
       TheProblem.contains( DataFileMessage::Keys::NewData  )      )
