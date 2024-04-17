@@ -40,7 +40,7 @@ namespace NebulOuS
 void MetricUpdater::AddMetricSubscription( 
      const MetricTopic & MetricDefinitions, const Address OptimiserController )
 {
-  JSON TheMetrics = MetricDefinitions.at( MetricList );
+  JSON TheMetrics = MetricDefinitions.at( MetricTopic::Keys::MetricList );
 
   if( TheMetrics.is_array() )
   {
@@ -68,7 +68,8 @@ void MetricUpdater::AddMetricSubscription(
       {
         Send( Theron::AMQ::NetworkLayer::TopicSubscription( 
           Theron::AMQ::NetworkLayer::TopicSubscription::Action::Subscription,
-          std::string( MetricValueRootString ) + MetricRecordPointer->first ), 
+          std::string( MetricValueUpdate::MetricValueRootString ) 
+                       + MetricRecordPointer->first ), 
           GetSessionLayerAddress() );
 
         AllMetricValuesSet = false;
@@ -85,7 +86,7 @@ void MetricUpdater::AddMetricSubscription(
       {
         Send( Theron::AMQ::NetworkLayer::TopicSubscription( 
           Theron::AMQ::NetworkLayer::TopicSubscription::Action::CloseSubscription,
-          std::string( MetricValueRootString ) + TheMetric ), 
+          std::string( MetricValueUpdate::MetricValueRootString ) + TheMetric ), 
           GetSessionLayerAddress() );
 
         MetricValues.erase( TheMetric );
@@ -138,14 +139,16 @@ void MetricUpdater::UpdateMetricValue(
 {
   Theron::AMQ::TopicName TheTopic 
           = TheMetricTopic.AsString().erase( 0, 
-                                      NebulOuS::MetricValueRootString.size() );
+                           MetricValueUpdate::MetricValueRootString.size() );
 
   if( MetricValues.contains( TheTopic ) )
   {
-    MetricValues.at( TheTopic ) = TheMetricValue.at( NebulOuS::ValueLabel );
+    MetricValues.at( TheTopic ) 
+      = TheMetricValue.at( MetricValueUpdate::Keys::ValueLabel );
     
     ValidityTime = std::max( ValidityTime, 
-      TheMetricValue.at( NebulOuS::TimePoint ).get< Solver::TimePointType >() );
+      TheMetricValue.at( 
+        MetricValueUpdate::Keys::TimePoint ).get< Solver::TimePointType >() );
   }
 }
 
@@ -183,7 +186,8 @@ void MetricUpdater::SLOViolationHandler(
         [](const auto & MetricValue){ return MetricValue.is_null(); }  ))) )
   {
     Send( Solver::ApplicationExecutionContext(
-      SeverityMessage.at( NebulOuS::TimePoint ).get< Solver::TimePointType >(),
+      SeverityMessage.at( 
+        MetricValueUpdate::Keys::TimePoint ).get< Solver::TimePointType >(),
       MetricValues, true
     ), TheSolverManager );
 
@@ -250,17 +254,17 @@ MetricUpdater::MetricUpdater( const std::string UpdaterName,
 
   Send( Theron::AMQ::NetworkLayer::TopicSubscription(
     Theron::AMQ::NetworkLayer::TopicSubscription::Action::Subscription,
-    NebulOuS::MetricSubscriptions ), 
+    MetricTopic::AMQTopic ), 
     GetSessionLayerAddress() );
 
   Send( Theron::AMQ::NetworkLayer::TopicSubscription(
     Theron::AMQ::NetworkLayer::TopicSubscription::Action::Subscription,
-    NebulOuS::ReconfigurationTopic ), 
+    ReconfigurationMessage::AMQTopic ), 
     GetSessionLayerAddress() );
 
   Send( Theron::AMQ::NetworkLayer::TopicSubscription(
     Theron::AMQ::NetworkLayer::TopicSubscription::Action::Subscription,
-    NebulOuS::SLOViolationTopic ), 
+    SLOViolation::AMQTopic ), 
     GetSessionLayerAddress() ); 
 }
 
@@ -275,24 +279,25 @@ MetricUpdater::~MetricUpdater()
   {
     Send( Theron::AMQ::NetworkLayer::TopicSubscription(
       Theron::AMQ::NetworkLayer::TopicSubscription::Action::CloseSubscription,
-      NebulOuS::MetricSubscriptions ), 
+      MetricTopic::AMQTopic ), 
       GetSessionLayerAddress() );
 
     Send( Theron::AMQ::NetworkLayer::TopicSubscription(
       Theron::AMQ::NetworkLayer::TopicSubscription::Action::CloseSubscription,
-      NebulOuS::ReconfigurationTopic ), 
+      ReconfigurationMessage::AMQTopic ), 
       GetSessionLayerAddress() );
 
     Send( Theron::AMQ::NetworkLayer::TopicSubscription(
       Theron::AMQ::NetworkLayer::TopicSubscription::Action::CloseSubscription,
-      NebulOuS::SLOViolationTopic ), 
+      SLOViolation::AMQTopic ), 
       GetSessionLayerAddress() );  
 
     std::ranges::for_each( std::views::keys( MetricValues ),
     [this]( const Theron::AMQ::TopicName & TheMetricTopic ){
       Send( Theron::AMQ::NetworkLayer::TopicSubscription(
         Theron::AMQ::NetworkLayer::TopicSubscription::Action::CloseSubscription,
-        std::string( MetricValueRootString ) + TheMetricTopic ), 
+        std::string( MetricValueUpdate::MetricValueRootString ) 
+                     + TheMetricTopic ), 
         GetSessionLayerAddress() );
     });
   }
