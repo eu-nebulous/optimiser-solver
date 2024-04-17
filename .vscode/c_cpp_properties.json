@@ -35,7 +35,8 @@
                     "/opt/AMPL/amplapi/include/",
                     "/usr/include/c++/13",
                     "/usr/include/linux",
-                    "/home/GHo/Documents/Code/NebulOuS/Solvers"
+                    "/home/GHo/Documents/Code/NebulOuS/Solvers",
+                    "."
                 ],
                 "limitSymbolsToIncludedHeaders": false
             }
