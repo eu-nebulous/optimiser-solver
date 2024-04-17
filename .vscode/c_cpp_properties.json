@@ -3,19 +3,16 @@
         {
             "name": "Linux",
             "includePath": [
+                "/home/GHo/Documents/Code/NebulOuS/Solvers",
                 "/home/GHo/Documents/Code/Theron++",
                 "/home/GHo/Documents/Code/CxxOpts/include",
                 "/opt/AMPL/amplapi/include",
                 "${workspaceFolder}/**",
-                "/home/GHo/Documents/Code/NebulOuS/Solvers",
                 "/usr/include/c++/13",
-                "/home/GHo/Documents/Code/Theron++",
-                "/usr/include/c++/13/x86_64-redhat-linux",
-                "/usr/include/linux",
-                "/usr/include/c++/13/tr1"
+                "/usr/include/linux"
             ],
             "defines": [],
-            "cStandard": "c23",
+            "cStandard": "gnu23",
             "intelliSenseMode": "linux-gcc-x64",
             "compilerPath": "/usr/lib64/ccache/g++",
             "compilerArgs": [
@@ -26,16 +23,16 @@
                 "-I/opt/AMPL/amplapi/include/"
             ],
             "cppStandard": "c++23",
-            "mergeConfigurations": false,
+            "mergeConfigurations": true,
             "configurationProvider": "ms-vscode.makefile-tools",
             "browse": {
                 "path": [
+                    "/home/GHo/Documents/Code/NebulOuS/Solvers",
                     "/home/GHo/Documents/Code/Theron++",
                     "/home/GHo/Documents/Code/CxxOpts/include",
                     "/opt/AMPL/amplapi/include",
                     "/usr/include/c++/13",
-                    "/usr/include/linux",
-                    "/home/GHo/Documents/Code/NebulOuS/Solvers"
+                    "/usr/include/linux"
                 ],
                 "limitSymbolsToIncludedHeaders": true
             }
