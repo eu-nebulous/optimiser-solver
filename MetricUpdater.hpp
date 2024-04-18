@@ -320,7 +320,7 @@ private:
     // optimiser as the sender.
 
     static constexpr std::string_view AMQTopic
-                     = "eu.nebulouscloud.optimiser.adaptations";
+                     = "eu.nebulouscloud.optimiser.controller.reconfiguration";
 
     // Constructors
 
