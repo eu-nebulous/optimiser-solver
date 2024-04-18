@@ -79,52 +79,6 @@ public:
   // Application Execution Context
   // --------------------------------------------------------------------------
   //
-  // The message is defined as a JSON message representing an attribute-value 
-  // object. The attributes expected are defined as constant strings so that 
-  // the actual textual representation can be changed without changing the code
-  // 
-  // "Timestamp" : This is the field giving the implicit order of the 
-  // different application execution execution contexts waiting for being 
-  // solved when there are more requests than there are solvers available to 
-  // work on the different problems. 
-
-  static constexpr std::string_view TimeStamp = "Timestamp";
-
-  // There is also a definition for the objective function label since a multi-
-  // objective optimisation problem can have multiple objective functions and 
-  // the solution is found for only one of these functions at the time even 
-  // though all objective function values will be returned with the solution, 
-  // the solution will maximise only the objective function whose label is 
-  // given in the application execution context request message.
-  //
-  // The Application Execution Cntext message may contain the name of the 
-  // objective function to maximise. If so, this should be stored under the 
-  // key name indicated here. However, if the objective function name is not 
-  // given, the default objective function is used. The default objective 
-  // function will be named when defining the optimisation problem.
-
-  static constexpr std::string_view 
-  ObjectiveFunctionLabel = "ObjectiveFunction";
-
-  // Finally, there is another JSON object that defines all the metric name and
-  // value pairs that define the actual execution context. Note that there must
-  // be at least one metric-value pair for the request to be valid.
-
-  static constexpr std::string_view ExecutionContext = "ExecutionContext";
-
-  // Finally, the execution context can come from the Metric Collector actor
-  // as a consequence of an SLO Violation being detected. In this case the 
-  // optimised solution found by the solver should trigger a reconfiguration.
-  // However, various application execution context can also be tried for 
-  // simulating future events and to investigate which configuration would be
-  // the best for these situations. In this case the optimised solution should
-  // not reconfigure the running application. For this reason there is a flag
-  // in the message indicating whether the solution should be deployed, and 
-  // its default value is 'false' to prevent solutions form accidentially being
-  // deployed.
-
-  static constexpr std::string_view DeploymentFlag = "DeploySolution";
-
   // To ensure that the execution context is correctly provided by the senders
   // The expected metric value structure is defined as a type based on the 
   // standard unsorted map based on a JSON value object since this can hold 
@@ -161,6 +115,48 @@ public:
     static constexpr std::string_view AMQTopic 
                      = "eu.nebulouscloud.optimiser.solver.context";
 
+    // The keys used in the JSON message to send are defined first:
+    //
+    // "Timestamp" : This is the field giving the implicit order of the 
+    //    different application execution execution contexts waiting for being 
+    //    solved when there are more requests than there are solvers available
+    //    to work on the different problems. 
+    // "ObjectFunction" : There is also a definition for the objective function
+    //    label since a multi-objective optimisation problem can have multiple 
+    //    objective functions and the solution is found for only one of these
+    //    functions at the time even though all objective function values will
+    //    be returned with the solution, the solution will maximise only the 
+    //    objective function whose label is given in the application execution
+    //    context request message. The Application Execution Cntext message may
+    //    contain the name of the objective function to maximise. If so, this
+    //    should be stored under the key name indicated here. However, if the
+    //    objective function name is not given, the default objective function 
+    //    is used. The default objective function will be named when defining 
+    //    the optimisation problem.
+    // "ExecutionContext" : Defines all the metric name and value pairs that
+    //    define the actual execution context. Note that there must be at least
+    //    one metric-value pair for the request to be valid.
+    // "DeploySolution" : The execution context can come from the Metric 
+    //    Collector actor as a consequence of an SLO Violation being detected.
+    //    In this case the optimised solution found by the solver should trigger
+    //    a reconfiguration. However, various application execution context can
+    //    also be tried for simulating future events and to investigate which
+    //    configuration would be the best for these situations. In this case the
+    //    optimised solution should not reconfigure the running application. For
+    //    this reason there is a flag in the message indicating whether the 
+    //    solution should be deployed, and its default value is 'false' to 
+    //    prevent solutions form accidentially being deployed.
+
+
+    struct Keys
+    {
+      static constexpr std::string_view
+        TimeStamp               = "Timestamp",
+        ObjectiveFunctionLabel  = "ObjectiveFunction",
+        ExecutionContext        = "ExecutionContext",
+        DeploymentFlag          = "DeploySolution";
+    };
+
     // The full constructor takes the time point, the objective function to 
     // solve for, and the application's execution context as the metric map
 
@@ -169,10 +165,10 @@ public:
                                  const MetricValueType & TheContext,
                                  bool DeploySolution = false )
     : JSONTopicMessage( std::string( AMQTopic ),
-    { { std::string( TimeStamp ), MicroSecondTimePoint },
-      { std::string( ObjectiveFunctionLabel ), ObjectiveFunctionID },
-      { std::string( ExecutionContext ), TheContext },
-      { std::string( DeploymentFlag ), DeploySolution }
+    { { Keys::TimeStamp, MicroSecondTimePoint },
+      { Keys::ObjectiveFunctionLabel, ObjectiveFunctionID },
+      { Keys::ExecutionContext, TheContext },
+      { Keys::DeploymentFlag, DeploySolution }
     }) {}
 
     // The constructor omitting the objective function identifier is similar
@@ -183,9 +179,9 @@ public:
                                  const MetricValueType & TheContext,
                                  bool DeploySolution = false )
     : JSONTopicMessage( std::string( AMQTopic ),
-    { { std::string( TimeStamp ), MicroSecondTimePoint },
-      { std::string( ExecutionContext ), TheContext },
-      { std::string( DeploymentFlag ), DeploySolution }
+    { { Keys::TimeStamp, MicroSecondTimePoint },
+      { Keys::ExecutionContext, TheContext },
+      { Keys::DeploymentFlag, DeploySolution }
     }) {}
 
     // The copy constructor simply passes the job on to the JSON Topic
@@ -206,9 +202,9 @@ public:
     virtual ~ApplicationExecutionContext() = default;
   };
 
-  // The handler for this message is virtual as it where the real action will
-  // happen and the search for the optimal solution will hopefully lead to a
-  // feasible soltuion that can be returned to the sender of the applicaton 
+  // The handler for this message is virtual as it is where the real action
+  // will happen and the search for the optimal solution will hopefully lead
+  // to a feasible soltuion that can be returned to the sender of the applicaton
   // context.
 
 protected:
@@ -241,26 +237,47 @@ public:
   {
   public:
 
+    // There are some aliases that can be used in other Actors processing this
+    // message in order to ensure portability
+
     using ObjectiveValuesType = MetricValueType;
     using VariableValuesType  = MetricValueType;
 
-    static constexpr std::string_view ObjectiveValues = "ObjectiveValues";
-    static constexpr std::string_view VariableValues  = "VariableValues";
-
+    // The topic for which the message is published is defined first
+   
     static constexpr std::string_view AMQTopic 
                      = "eu.nebulouscloud.optimiser.solver.solution";
 
+    // Most of the message keys are the same as for the application execution 
+    // context, but there are two new:
+    //
+    // "ObjectiveValues" : This holds a map of objective function names and 
+    //    their values under the currently found solution which is optimised
+    //    for the given objective function or the default objective function.
+    //    The other objective values is useful if one is searching for the 
+    //    Pareto front of the problem.
+    // "VariableValues" : This key is a map holding the variable names and 
+    //    their values found by the solver for the optimal solution. This is
+    //    used to reconfigure the application.
+
+    struct Keys : public ApplicationExecutionContext::Keys
+    {
+      static constexpr std::string_view
+        ObjectiveValues = "ObjectiveValues",
+        VariableValues  = "VariableValues";
+    };
+    
     Solution( const TimePointType MicroSecondTimePoint,
               const std::string ObjectiveFunctionID,
               const ObjectiveValuesType & TheObjectiveValues,
               const VariableValuesType & TheVariables,
               bool DeploySolution )
     : JSONTopicMessage( std::string( AMQTopic ) ,
-      { { std::string( TimeStamp ), MicroSecondTimePoint   },
-        { std::string( ObjectiveFunctionLabel ), ObjectiveFunctionID },
-        { std::string( ObjectiveValues ) , TheObjectiveValues },
-        { std::string( VariableValues ), TheVariables },
-        { std::string( DeploymentFlag ), DeploySolution }
+      { { Keys::TimeStamp, MicroSecondTimePoint   },
+        { Keys::ObjectiveFunctionLabel, ObjectiveFunctionID },
+        { Keys::ObjectiveValues, TheObjectiveValues },
+        { Keys::VariableValues, TheVariables },
+        { Keys::DeploymentFlag, DeploySolution }
       } )
       {}
     
@@ -335,6 +352,11 @@ public:
       Theron::AMQ::NetworkLayer::TopicSubscription::Action::Subscription,
       OptimisationProblem::AMQTopic
     ), GetSessionLayerAddress() );
+
+    Send( Theron::AMQ::NetworkLayer::TopicSubscription(
+      Theron::AMQ::NetworkLayer::TopicSubscription::Action::Subscription,
+      ApplicationExecutionContext::AMQTopic
+    ), GetSessionLayerAddress() );
   }
   
   Solver() = delete;
@@ -342,10 +364,18 @@ public:
   virtual ~Solver()
   {
     if( HasNetwork() )
+    {
       Send( Theron::AMQ::NetworkLayer::TopicSubscription(
         Theron::AMQ::NetworkLayer::TopicSubscription::Action::CloseSubscription,
         OptimisationProblem::AMQTopic
       ), GetSessionLayerAddress() );
+
+      Send( Theron::AMQ::NetworkLayer::TopicSubscription(
+        Theron::AMQ::NetworkLayer::TopicSubscription::Action::CloseSubscription,
+        ApplicationExecutionContext::AMQTopic
+      ), GetSessionLayerAddress() );
+
+    }
   }
 };
 

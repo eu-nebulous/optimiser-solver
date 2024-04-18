@@ -70,74 +70,6 @@ namespace NebulOuS
 {
 /*==============================================================================
 
- Basic interface definitions
-
-==============================================================================*/
-//
-// Definitions for the terminology to facilitate changing the lables of the 
-// various message labels without changing the code. The definitions are 
-// compile time constants and as such should not lead to any run-time overhead.
-// The JSON attribute names may be found under the "Predicted monitoring 
-// metrics" section on the Wiki page [1].
-
-constexpr std::string_view ValueLabel = "metricValue";
-constexpr std::string_view TimePoint  = "predictionTime";
-
-// The topic used for receiving the message(s) defining the metrics of the 
-// application execution context as published by the Optimiser Controller is 
-// defined next.
-
-constexpr std::string_view MetricSubscriptions 
-          = "eu.nebulouscloud.optimiser.controller.metric_list";
-
-// The JSON message attribute for the list of metrics is another JSON object
-// stored under the following key, see the Event type III defined in 
-// https://158.39.75.54/projects/nebulous-collaboration-hub/wiki/slo-severity-based-violation-detector
-// where the name of the metric is defined under as sub-key.
-
-constexpr std::string_view MetricList = "metrics";
-
-// The metric value messages will be published on different topics and to 
-// check if an inbound message is from a metric value topic, it is necessary 
-// to test against the base string for the metric value topics according to 
-// the Wiki-page [1]
-
-constexpr std::string_view MetricValueRootString
-          = "eu.nebulouscloud.monitoring.predicted.";
-
-// The SLO violation detector will publish a message when a reconfiguration is 
-// deamed necessary for a future time point called "Event type V" on the wiki 
-// page [3]. The event contains a probability for at least one of the SLOs 
-// being violated at the predicted time point. It is not clear if the assessment
-// is being made by the SLO violation detector at every new metric prediction,
-// or if this event is only signalled when the probability is above some 
-// internal threshold of the SLO violation detector. 
-//
-// The current implementation assumes that the latter is the case, and hence 
-// just receiving the message indicates that a new application configuration 
-// should be found given the application execution context as predicted by the 
-// metric values recorded by the Metric Updater.  Should this assumption be 
-// wrong, the probability must be compared with some  user set threshold for 
-// each message, and to cater for this the probability field will always be 
-// compared to a threshold, currently set to zero to ensure that every event 
-// message will trigger a reconfiguration.
-//
-// The messages from the Optimizer Controller will be sent on a topic that 
-// should follow some standard topic convention.
-
-constexpr std::string_view SLOViolationTopic 
-          = "eu.nebulouscloud.monitoring.slo.severity_value";
-
-// When a reconfiguration has been enacted by the Optimiser Controller and 
-// a new configuration is confirmed to be running on the new platofrm, it will 
-// send a message to inform all other components that the reconfiguration 
-// has happened on the following topic.
-
-constexpr std::string_view ReconfigurationTopic
-          = "eu.nebulouscloud.optimiser.adaptations";
-
-/*==============================================================================
-
  Metric Updater
 
 ==============================================================================*/
@@ -178,14 +110,12 @@ private:
 
   Solver::TimePointType ValidityTime;
 
-  // There is also a flag to indicate when all metric values have received 
-  // values since optimising for a application execution context defiend all 
-  // metrics requires that at least one value is received for each metric. This
-  // condition could be tested before sending the request to find a new 
-  // solution, but this means testing all metrics in a linear scan for a 
-  // condition that will only happen initially until all metrics have been seen
-  // and so it is better for the performance if there is a flag to check for 
-  // this condition.
+  // When an SLO violation message is received the current vector of metric 
+  // values should be sent as an application execution context (message) to the
+  // Solution Manager actor that will invoke a solver to find the optimal 
+  // configuration for this configuration. The Metric Updater must therefore 
+  // know the address of the Soler Manager, and this must be passed to 
+  // the constructor.
 
   bool AllMetricValuesSet;
 
@@ -204,17 +134,34 @@ private:
   {
   public:
 
+    // The topic used for receiving the message(s) defining the metrics of the 
+    // application execution context as published by the Optimiser Controller 
+    // is the following
+
+    static constexpr std::string_view AMQTopic 
+                     = "eu.nebulouscloud.optimiser.controller.metric_list";
+
+    // The EXN middleware sending the AMQP messages for the other component 
+    // of the NebulOuS project only sends JSON objects, meaning that the list 
+    // of metric names to subscribe is sent as a JSON array, but it must be 
+    // embedded in a map with a single key, see the message format described
+    // in the Wiki page at
+    // https://openproject.nebulouscloud.eu/projects/nebulous-collaboration-hub/wiki/1-optimiser-controller#controller-to-metric-updater-and-ems-metric-list
+
+    struct Keys
+    {
+      static constexpr std::string_view MetricList = "metrics";
+    };
+ 
+    // Constructors
+
     MetricTopic( void )
-    : JSONTopicMessage( std::string( MetricSubscriptions ) )
+    : JSONTopicMessage( AMQTopic )
     {}
 
     MetricTopic( const MetricTopic & Other )
     : JSONTopicMessage( Other )
     {}
-
-    // MetricTopic( const JSONTopicMessage & Other )
-    // : JSONTopicMessage( Other )
-    // {}
 
     virtual ~MetricTopic() = default;
   };
@@ -241,6 +188,25 @@ private:
   {
   public:
 
+    // The metric value messages will be published on different topics and to 
+    // check if an inbound message is from a metric value topic, it is 
+    // necessary to test against the base string for the metric value topics 
+    // according to the Wiki-page describing the Type II message:
+    // https://openproject.nebulouscloud.eu/projects/nebulous-collaboration-hub/wiki/monitoringdata-interface#type-ii-messages-predicted-monitoring-metrics
+
+    static constexpr std::string_view MetricValueRootString
+                      = "eu.nebulouscloud.monitoring.predicted.";
+
+    // Only two of the fields in this message will be looked up and stored
+    // in the current application context map.
+
+    struct Keys
+    {
+      static constexpr std::string_view 
+                ValueLabel = "metricValue",
+                TimePoint  = "predictionTime";
+    };
+
     MetricValueUpdate( void )
     : JSONWildcardMessage( std::string( MetricValueRootString ) )
     {}
@@ -263,21 +229,48 @@ private:
   // SLO violations
   // --------------------------------------------------------------------------
   //
-  // The SLO Violation detector publishes an event to indicate that at least 
-  // one of the constraints for the application deployment will be violated in 
-  // the predicted future, and that the search for a new solution should start.
-  // This will trigger the the publication of the Solver's Application Execution 
-  // context message. The context message will contain the current status of the
-  // metric values, and trigger a solver to find a new, optimal variable 
-  // assignment to be deployed to resolve the identified problem.
-
+  // The SLO violation detector will publish a message when a reconfiguration is 
+  // deamed necessary for a future time point called "Event type VI" on the wiki 
+  // page: https://openproject.nebulouscloud.eu/projects/nebulous-collaboration-hub/wiki/slo-severity-based-violation-detector#output-event-type-vi 
+  // The event contains a probability for at least one of the SLOs  being 
+  // violated at the predicted time point. It is not clear if the assessment
+  // is being made by the SLO violation detector at every new metric prediction,
+  // or if this event is only signalled when the probability is above some 
+  // internal threshold of the SLO violation detector. 
+  //
+  // The current implementation assumes that the latter is the case, and hence 
+  // just receiving the message indicates that a new application configuration 
+  // should be found given the application execution context as predicted by the 
+  // metric values recorded by the Metric Updater.  Should this assumption be 
+  // wrong, the probability must be compared with some  user set threshold for 
+  // each message, and to cater for this the probability field will always be 
+  // compared to a threshold, currently set to zero to ensure that every event 
+  // message will trigger a reconfiguration.
+  
   class SLOViolation
   : public Theron::AMQ::JSONTopicMessage
   {
   public:
 
+    // The messages from the SLO Violation Detector will be sent on a topic that 
+    // should follow some standard topic convention.
+
+    static constexpr std::string_view AMQTopic 
+                      = "eu.nebulouscloud.monitoring.slo.severity_value";
+
+    // The only information taken from this detction message is the prediction 
+    // time which will be used as the time for the application's execution 
+    // context when this is forwarded to the solvers for processing.
+
+    struct Keys
+    {
+      static constexpr std::string_view TimePoint  = "predictionTime";
+    };
+    
+    // Constructors
+
     SLOViolation( void )
-    : JSONTopicMessage( std::string( SLOViolationTopic ) )
+    : JSONTopicMessage( AMQTopic )
     {}
 
     SLOViolation( const SLOViolation & Other )
@@ -311,18 +304,28 @@ private:
 
   bool ReconfigurationInProgress;
 
-  // When the reconfiguration has been done and the Optimizer Controller 
-  // confirms that the application is running in a new configuration, it will 
-  // send a reconfiguration completed message. This message will just be a 
-  // JSON message.
+  // When a reconfiguration has been enacted by the Optimiser Controller and 
+  // a new configuration is confirmed to be running on the new platofrm, it 
+  // will send a message to inform all other components that the 
+  // reconfiguration has happened. The event is just the reception of the 
+  // message and its content will not be processed, so there are no keys for
+  // the JSON map received.
 
   class ReconfigurationMessage
   : public Theron::AMQ::JSONTopicMessage
   { 
   public:
 
+    // The topic for the reconfiguration finished messages is defined by the 
+    // optimiser as the sender.
+
+    static constexpr std::string_view AMQTopic
+                     = "eu.nebulouscloud.optimiser.controller.reconfiguration";
+
+    // Constructors
+
     ReconfigurationMessage( void )
-    : JSONTopicMessage( std::string( ReconfigurationTopic ) )
+    : JSONTopicMessage( AMQTopic )
     {}
 
     ReconfigurationMessage( const ReconfigurationMessage & Other )

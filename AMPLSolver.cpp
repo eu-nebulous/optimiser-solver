@@ -174,7 +174,11 @@ void AMPLSolver::DefineProblem(const Solver::OptimisationProblem & TheProblem,
   // The default values for the data will be loaded from the data file. This
   // operation is the same as the one done for data messages, and to avoid 
   // code duplication the handler is just invoked using the address of this
-  // solver Actor as the the sender is not important for this update.
+  // solver Actor as the the sender is not important for this update. However,
+  // if the information is missing from the message, no data file should be 
+  // loaded. It is necessary to convert the content to a string since the 
+  // JSON library only sees the string and not its length before it has been 
+  // unwrapped.
 
   if( TheProblem.contains( DataFileMessage::Keys::DataFile ) && 
       TheProblem.contains( DataFileMessage::Keys::NewData  )      )
@@ -255,7 +259,8 @@ void AMPLSolver::SolveProblem(
   // supported as values.
 
   for( const auto & [ TheName, MetricValue ] : 
-       Solver::MetricValueType( TheContext.at( Solver::ExecutionContext ) ) )
+       Solver::MetricValueType( TheContext.at( 
+       Solver::ApplicationExecutionContext::Keys::ExecutionContext ) ) )
     SetAMPLParameter( TheName, MetricValue );
 
   // Setting the given objective as the active objective and all other
@@ -264,8 +269,10 @@ void AMPLSolver::SolveProblem(
 
   std::string OptimisationGoal;
 
-  if( TheContext.contains( Solver::ObjectiveFunctionLabel ) )
-    OptimisationGoal = TheContext.at( Solver::ObjectiveFunctionLabel );
+  if( TheContext.contains( 
+      Solver::ApplicationExecutionContext::Keys::ObjectiveFunctionLabel ) )
+    OptimisationGoal = TheContext.at( 
+      Solver::ApplicationExecutionContext::Keys::ObjectiveFunctionLabel );
   else if( !DefaultObjectiveFunction.empty() )
     OptimisationGoal = DefaultObjectiveFunction;
   else
@@ -337,7 +344,8 @@ void AMPLSolver::SolveProblem(
   // application execution context has the deployment flag set.
 
   Solver::Solution::VariableValuesType VariableValues;
-  bool DeploymentFlagSet = TheContext.at( DeploymentFlag ).get<bool>();
+  bool DeploymentFlagSet 
+       = TheContext.at( Solver::Solution::Keys::DeploymentFlag ).get<bool>();
 
   for( auto Variable : ProblemDefinition.getVariables() )
   {
@@ -350,8 +358,9 @@ void AMPLSolver::SolveProblem(
 
   // The found solution can then be returned to the requesting actor or topic
 
-  Send( Solver::Solution(
-    TheContext.at( Solver::TimeStamp ).get< Solver::TimePointType >(),
+  Send( Solver::Solution( 
+    TheContext.at( 
+      Solver::Solution::Keys::TimeStamp ).get< Solver::TimePointType >(),
     OptimisationGoal, ObjectiveValues, VariableValues, 
     DeploymentFlagSet
   ), TheRequester ); 

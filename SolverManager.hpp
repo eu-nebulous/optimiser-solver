@@ -174,7 +174,8 @@ private:
     const Address TheRequester )
   {
     ContextQueue.emplace( 
-      TheContext.at( Solver::TimeStamp ).get< Solver::TimePointType >(), 
+      TheContext.at( Solver::ApplicationExecutionContext::Keys::TimeStamp 
+                   ).get< Solver::TimePointType >(), 
       TheContext );
 
     DispatchToSolvers();
