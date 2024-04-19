@@ -226,6 +226,74 @@ private:
                           const Address TheMetricTopic );
 
   // --------------------------------------------------------------------------
+  // Application lifecycle
+  // --------------------------------------------------------------------------
+  //
+  // There is a message from the Optimiser Controller when the status of the 
+  // application changes. The state communicated in this message shows the 
+  // current state of the application and decides how the Solver will act to
+  // SLO Violations detected.
+
+  class ApplicationLifecycle
+  : public Theron::AMQ::JSONTopicMessage
+  { 
+  public:
+
+    // The topic for the reconfiguration finished messages is defined by the 
+    // optimiser as the sender.
+
+    static constexpr std::string_view AMQTopic
+                     = "eu.nebulouscloud.optimiser.controller.app_state";
+
+    // The state of the application goes from the the initial creation of 
+    // the cluster to deployments covering reconfigurations. Note that there is
+    // no state indicating that the application has terminated.
+
+    enum class State
+    {
+      New,        // Waiting for the utility evaluator
+      Ready,      // The application is ready for deployment
+      Deploying,  // The application is being deployed or redeployed
+      Running,    // The application is running
+      Failed     // The application is in an invalid state
+    };
+
+    // An arriving lifecycle message indicates a change in state and it is 
+    // therefore a way to set a state variable directly from the message by
+    // a cast operator
+
+    operator State() const;
+
+    // Constructors and destructor
+
+    ApplicationLifecycle( void )
+    : JSONTopicMessage( AMQTopic )
+    {}
+
+    ApplicationLifecycle( const ApplicationLifecycle & Other )
+    : JSONTopicMessage( Other )
+    {}
+
+    virtual ~ApplicationLifecycle() = default;
+  };
+
+  // After starting a reconfiguration with an SLO Violation, one should not 
+  // initiate another reconfiguration because the state may the possibly be 
+  // inconsistent with the SLO Violation Detector belieivng that the old 
+  // configuration is still in effect while the new configuration is being 
+  // enacted. The application lifecycle state must therefore be marked as 
+  // running before the another SLO Violation will trigger the next 
+  // reconfiguration
+
+  ApplicationLifecycle::State ApplicationState;
+
+  // The handler for the lifecycle message simply updates this variable by 
+  // setting it to the state received in the lifecycle message.
+
+  void LifecycleHandler( const ApplicationLifecycle & TheState, 
+                         const Address TheLifecycleTopic );
+
+  // --------------------------------------------------------------------------
   // SLO violations
   // --------------------------------------------------------------------------
   //
@@ -294,54 +362,6 @@ private:
   // the constructor and stored for for the duration of the execution
 
   const Address TheSolverManager;
-
-  // After the sending of the application's excution context, one should not 
-  // initiate another reconfiguration because the state may the possibly be 
-  // inconsistent with the SLO Violation Detector belieivng that the old 
-  // configuration is still in effect while the new configuration is being 
-  // enacted. It is therefore a flag that will be set by the SLO Violation 
-  // handler indicating that a reconfiguration is ongoing.
-
-  bool ReconfigurationInProgress;
-
-  // When a reconfiguration has been enacted by the Optimiser Controller and 
-  // a new configuration is confirmed to be running on the new platofrm, it 
-  // will send a message to inform all other components that the 
-  // reconfiguration has happened. The event is just the reception of the 
-  // message and its content will not be processed, so there are no keys for
-  // the JSON map received.
-
-  class ReconfigurationMessage
-  : public Theron::AMQ::JSONTopicMessage
-  { 
-  public:
-
-    // The topic for the reconfiguration finished messages is defined by the 
-    // optimiser as the sender.
-
-    static constexpr std::string_view AMQTopic
-                     = "eu.nebulouscloud.optimiser.controller.reconfiguration";
-
-    // Constructors
-
-    ReconfigurationMessage( void )
-    : JSONTopicMessage( AMQTopic )
-    {}
-
-    ReconfigurationMessage( const ReconfigurationMessage & Other )
-    : JSONTopicMessage( Other )
-    {}
-
-    virtual ~ReconfigurationMessage() = default;
-  };
-
-  // The handler for this message will actually not use its contents, but only
-  // note that the reconfiguration has been completed to reset the 
-  // reconfiguration in progress flag allowing future SLO Violation Events to 
-  // triger new reconfigurations.
-
-  void ReconfigurationDone( const ReconfigurationMessage & TheReconfiguraton, 
-                            const Address TheReconfigurationTopic );
 
   // --------------------------------------------------------------------------
   // Constructor and destructor
