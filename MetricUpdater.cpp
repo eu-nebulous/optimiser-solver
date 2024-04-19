@@ -148,6 +148,42 @@ void MetricUpdater::UpdateMetricValue(
 }
 
 // --------------------------------------------------------------------------
+// Application lifcycle
+// --------------------------------------------------------------------------
+//
+// When the lifecycle message is received, the state is just recorded in the
+// state variable.
+
+void MetricUpdater::LifecycleHandler( 
+     const ApplicationLifecycle & TheState, 
+     const Address TheLifecycleTopic )
+{
+  Theron::ConsoleOutput Output;
+
+  ApplicationState = TheState;
+
+  Output << "Application state updated: " << std::endl
+         << TheState.dump(2) << std::endl;
+}
+
+// The message handler used the conversion operator to read out the state 
+// carried in the message. It is based on having a static map from the textual
+// representation of the state to the enumeration.
+
+MetricUpdater::ApplicationLifecycle::operator State() const
+{
+  static std::map< std::string_view, State > LifecycleStates{
+    {"NEW", State::New},
+    {"READY", State::Ready},
+    {"DEPLOYING", State::Deploying},
+    {"RUNNING", State::Running},
+    {"FAILED", State::Failed}
+  };
+
+  return LifecycleStates.at( this->at("state").get< std::string >() );
+}
+
+// --------------------------------------------------------------------------
 // SLO Violation Events
 // --------------------------------------------------------------------------
 //
@@ -174,7 +210,7 @@ void MetricUpdater::SLOViolationHandler(
   Output << "Metric Updater: SLO violation received " << std::endl
          << SeverityMessage.dump(2) << std::endl;
 
-  if( !ReconfigurationInProgress && 
+  if(( ApplicationState == ApplicationLifecycle::State::Running ) && 
      ( AllMetricValuesSet || 
       (!MetricValues.empty() &&
         std::ranges::none_of( std::views::values( MetricValues ), 
@@ -183,39 +219,15 @@ void MetricUpdater::SLOViolationHandler(
     Send( Solver::ApplicationExecutionContext(
       SeverityMessage.at( 
         MetricValueUpdate::Keys::TimePoint ).get< Solver::TimePointType >(),
-      MetricValues, true
+        MetricValues, true
     ), TheSolverManager );
 
-    AllMetricValuesSet        = true;
-    ReconfigurationInProgress = true;
+    AllMetricValuesSet  = true;
+    ApplicationState    = ApplicationLifecycle::State::Deploying;
   }
   else
     Output << "... failed to forward the application execution context (size: " 
            << MetricValues.size() << ")" << std::endl;
-}
-
-// --------------------------------------------------------------------------
-// Reconfigured application
-// --------------------------------------------------------------------------
-//
-// When the reconfiguration message is received it is an indication tha the 
-// Optimiser Controller has reconfigured the application and that the 
-// application is running in the new configuration found by the solver. 
-// It is the event that is important m not the content of the message, and 
-// it is therefore only used to reset the ongoing reconfiguration flag.
-
-void MetricUpdater::ReconfigurationDone( 
-     const ReconfigurationMessage & TheReconfiguraton, 
-     const Address TheReconfigurationTopic )
-{
-  Theron::ConsoleOutput Output;
-
-  ReconfigurationInProgress = false;
-
-  Output << "Reconfiguration ongoing flag reset after receiving the following "
-         << "message indicating that the previous reconfiguration was"
-         << "completed: " << std::endl
-         << TheReconfiguraton.dump(2) << std::endl;
 }
 
 // --------------------------------------------------------------------------
@@ -239,13 +251,13 @@ MetricUpdater::MetricUpdater( const std::string UpdaterName,
   StandardFallbackHandler( Actor::GetAddress().AsString() ),
   NetworkingActor( Actor::GetAddress().AsString() ),
   MetricValues(), ValidityTime(0), AllMetricValuesSet(false),
-  TheSolverManager( ManagerOfSolvers ),
-  ReconfigurationInProgress( false )
+  ApplicationState( ApplicationLifecycle::State::New ),
+  TheSolverManager( ManagerOfSolvers )
 {
   RegisterHandler( this, &MetricUpdater::AddMetricSubscription );
   RegisterHandler( this, &MetricUpdater::UpdateMetricValue     );
   RegisterHandler( this, &MetricUpdater::SLOViolationHandler   );
-  RegisterHandler( this, &MetricUpdater::ReconfigurationDone   );
+  RegisterHandler( this, &MetricUpdater::LifecycleHandler      );
 
   Send( Theron::AMQ::NetworkLayer::TopicSubscription(
     Theron::AMQ::NetworkLayer::TopicSubscription::Action::Subscription,
@@ -254,7 +266,7 @@ MetricUpdater::MetricUpdater( const std::string UpdaterName,
 
   Send( Theron::AMQ::NetworkLayer::TopicSubscription(
     Theron::AMQ::NetworkLayer::TopicSubscription::Action::Subscription,
-    ReconfigurationMessage::AMQTopic ), 
+    ApplicationLifecycle::AMQTopic ), 
     GetSessionLayerAddress() );
 
   Send( Theron::AMQ::NetworkLayer::TopicSubscription(
@@ -279,7 +291,7 @@ MetricUpdater::~MetricUpdater()
 
     Send( Theron::AMQ::NetworkLayer::TopicSubscription(
       Theron::AMQ::NetworkLayer::TopicSubscription::Action::CloseSubscription,
-      ReconfigurationMessage::AMQTopic ), 
+      ApplicationLifecycle::AMQTopic ), 
       GetSessionLayerAddress() );
 
     Send( Theron::AMQ::NetworkLayer::TopicSubscription(
