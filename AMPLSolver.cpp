@@ -247,7 +247,8 @@ void AMPLSolver::SolveProblem(
 {
   Theron::ConsoleOutput Output;
 
-  Output << "AMPL Solver: Application Execution Context received. Problem Undefined = " << ProblemUndefined << std::endl
+  Output << "AMPL Solver: Application Execution Context received. Problem Undefined = " 
+         << std::boolalpha << ProblemUndefined << std::endl
          << TheContext.dump(2) << std::endl;
 
   // There is nothing to do if the application model is missing.

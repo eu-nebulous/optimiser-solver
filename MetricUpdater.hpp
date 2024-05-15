@@ -110,14 +110,14 @@ private:
 
   Solver::TimePointType ValidityTime;
 
-  // When an SLO violation message is received the current vector of metric 
-  // values should be sent as an application execution context (message) to the
-  // Solution Manager actor that will invoke a solver to find the optimal 
-  // configuration for this configuration. The Metric Updater must therefore 
-  // know the address of the Soler Manager, and this must be passed to 
-  // the constructor.
+  // The metric context is not complete before at least one value has been 
+  // received for each metric. It is therefore a counter keeping track of 
+  // metric values that are defined, but has not yet seen their first value 
+  // update. An SLO violation message will only result in the triggering of 
+  // a serch for a solution if all metric values have a value so that a 
+  // proper metric context can be forwarded to the solver.
 
-  bool AllMetricValuesSet;
+  unsigned int UnsetMetrics;
 
   // --------------------------------------------------------------------------
   // Subscribing to metric prediction values
