@@ -110,14 +110,14 @@ private:
 
   Solver::TimePointType ValidityTime;
 
-  // When an SLO violation message is received the current vector of metric 
-  // values should be sent as an application execution context (message) to the
-  // Solution Manager actor that will invoke a solver to find the optimal 
-  // configuration for this configuration. The Metric Updater must therefore 
-  // know the address of the Soler Manager, and this must be passed to 
-  // the constructor.
+  // The metric context is not complete before at least one value has been 
+  // received for each metric. It is therefore a counter keeping track of 
+  // metric values that are defined, but has not yet seen their first value 
+  // update. An SLO violation message will only result in the triggering of 
+  // a serch for a solution if all metric values have a value so that a 
+  // proper metric context can be forwarded to the solver.
 
-  bool AllMetricValuesSet;
+  unsigned int UnsetMetrics;
 
   // --------------------------------------------------------------------------
   // Subscribing to metric prediction values
@@ -362,6 +362,54 @@ private:
   // the constructor and stored for for the duration of the execution
 
   const Address TheSolverManager;
+
+  // After the sending of the application's excution context, one should not 
+  // initiate another reconfiguration because the state may the possibly be 
+  // inconsistent with the SLO Violation Detector belieivng that the old 
+  // configuration is still in effect while the new configuration is being 
+  // enacted. It is therefore a flag that will be set by the SLO Violation 
+  // handler indicating that a reconfiguration is ongoing.
+
+  bool ReconfigurationInProgress;
+
+  // When a reconfiguration has been enacted by the Optimiser Controller and 
+  // a new configuration is confirmed to be running on the new platofrm, it 
+  // will send a message to inform all other components that the 
+  // reconfiguration has happened. The event is just the reception of the 
+  // message and its content will not be processed, so there are no keys for
+  // the JSON map received.
+
+  class ReconfigurationMessage
+  : public Theron::AMQ::JSONTopicMessage
+  { 
+  public:
+
+    // The topic for the reconfiguration finished messages is defined by the 
+    // optimiser as the sender.
+
+    static constexpr std::string_view AMQTopic
+                     = "eu.nebulouscloud.optimiser.controller.reconfiguration";
+
+    // Constructors
+
+    ReconfigurationMessage( void )
+    : JSONTopicMessage( AMQTopic )
+    {}
+
+    ReconfigurationMessage( const ReconfigurationMessage & Other )
+    : JSONTopicMessage( Other )
+    {}
+
+    virtual ~ReconfigurationMessage() = default;
+  };
+
+  // The handler for this message will actually not use its contents, but only
+  // note that the reconfiguration has been completed to reset the 
+  // reconfiguration in progress flag allowing future SLO Violation Events to 
+  // triger new reconfigurations.
+
+  void ReconfigurationDone( const ReconfigurationMessage & TheReconfiguraton, 
+                            const Address TheReconfigurationTopic );
 
   // --------------------------------------------------------------------------
   // Constructor and destructor

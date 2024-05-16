@@ -59,16 +59,16 @@ void MetricUpdater::AddMetricSubscription(
 
         TheMetricNames.insert( MetricRecordPointer->first );
 
+        // If a new metric was added, a subscription will be set up for this 
+        // new metric, and the flag indicating that values have been received 
+        // for all metrics will be reset.
+
       if( MetricAdded )
-      {
         Send( Theron::AMQ::NetworkLayer::TopicSubscription( 
           Theron::AMQ::NetworkLayer::TopicSubscription::Action::Subscription,
           std::string( MetricValueUpdate::MetricValueRootString ) 
                        + MetricRecordPointer->first ), 
           GetSessionLayerAddress() );
-
-        AllMetricValuesSet = false;
-      }
     }
 
     // There could be some metric value records that were defined by the
@@ -86,6 +86,16 @@ void MetricUpdater::AddMetricSubscription(
 
         MetricValues.erase( TheMetric );
       }
+
+    // Finally the number of metrics that does not yet have a value is counted
+    // to ensure that these must be received before the application context 
+    // can be forwarded to the solver manager.
+
+    if( MetricValues.empty() )
+      UnsetMetrics = 1;
+    else
+      UnsetMetrics = std::ranges::count_if( std::views::values( MetricValues ), 
+      [](const auto & MetricValue){ return MetricValue.is_null(); }  );
   }
   else
   {
@@ -101,6 +111,10 @@ void MetricUpdater::AddMetricSubscription(
 
     throw std::invalid_argument( ErrorMessage.str() );
   }
+
+  Theron::ConsoleOutput Output;
+  Output << "Received metric subscription request: " << std::endl
+         << MetricDefinitions.dump(2) << std::endl;
 }
 
 // The metric update value is received whenever any of subscribed forecasters
@@ -132,6 +146,12 @@ void MetricUpdater::AddMetricSubscription(
 void MetricUpdater::UpdateMetricValue( 
      const MetricValueUpdate & TheMetricValue, const Address TheMetricTopic)
 {
+  Theron::ConsoleOutput Output;
+
+  Output << "Metric value received: " << std::endl 
+         << "   Topic: " << TheMetricTopic.AsString() << std::endl
+         << TheMetricValue.dump(2) << std::endl;
+         
   Theron::AMQ::TopicName TheTopic 
           = TheMetricTopic.AsString().erase( 0, 
                            MetricValueUpdate::MetricValueRootString.size() );
@@ -144,6 +164,17 @@ void MetricUpdater::UpdateMetricValue(
     ValidityTime = std::max( ValidityTime, 
       TheMetricValue.at( 
         MetricValueUpdate::Keys::TimePoint ).get< Solver::TimePointType >() );
+
+    if( UnsetMetrics )
+      UnsetMetrics = std::ranges::count_if( std::views::values( MetricValues ), 
+        [](const auto & MetricValue){ return MetricValue.is_null(); }  );
+
+    Output << "Metric " << TheTopic << " has new value " 
+           << MetricValues.at( TheTopic ) << std::endl;
+  }
+  else
+  {
+    Output << TheTopic << " is not a known metric and ignored " << std::endl;
   }
 }
 
@@ -202,6 +233,11 @@ MetricUpdater::ApplicationLifecycle::operator State() const
 // message will just be ignored. In order to avoid the scan over all metrics
 // to see if they are set, a boolean flag will be used and set once all metrics
 // have values. Then future scans will be avoided.
+// The message will be ignored if not all metric values have been received 
+// or if there are no metric values defined. In both cases the SLO violation 
+// message will just be ignored. In order to avoid the scan over all metrics
+// to see if they are set, a boolean flag will be used and set once all metrics
+// have values. Then future scans will be avoided.
 
 void MetricUpdater::SLOViolationHandler( 
      const SLOViolation & SeverityMessage, const Address TheSLOTopic )
@@ -211,23 +247,29 @@ void MetricUpdater::SLOViolationHandler(
          << SeverityMessage.dump(2) << std::endl;
 
   if(( ApplicationState == ApplicationLifecycle::State::Running ) && 
-     ( AllMetricValuesSet || 
-      (!MetricValues.empty() &&
-        std::ranges::none_of( std::views::values( MetricValues ), 
-        [](const auto & MetricValue){ return MetricValue.is_null(); }  ))) )
+     ( UnsetMetrics == 0 ) )
   {
     Send( Solver::ApplicationExecutionContext(
       SeverityMessage.at( 
         MetricValueUpdate::Keys::TimePoint ).get< Solver::TimePointType >(),
-        MetricValues, true
+      MetricValues, true
     ), TheSolverManager );
 
-    AllMetricValuesSet  = true;
     ApplicationState    = ApplicationLifecycle::State::Deploying;
   }
   else
+  {
     Output << "... failed to forward the application execution context (size: " 
-           << MetricValues.size() << ")" << std::endl;
+           << MetricValues.size() << "," << " Unset: " << UnsetMetrics 
+           << ")" << std::endl;
+
+    if( MetricValues.empty() )
+      Output << "The Metric Value map is empty! " << std::endl;
+    else
+      for( auto & MetricRecord : MetricValues )
+        Output << MetricRecord.first << " with value " 
+               << MetricRecord.second.dump(2) << " end " << std::endl;
+  }
 }
 
 // --------------------------------------------------------------------------
@@ -250,15 +292,15 @@ MetricUpdater::MetricUpdater( const std::string UpdaterName,
 : Actor( UpdaterName ),
   StandardFallbackHandler( Actor::GetAddress().AsString() ),
   NetworkingActor( Actor::GetAddress().AsString() ),
-  MetricValues(), ValidityTime(0), AllMetricValuesSet(false),
+  MetricValues(), ValidityTime(0), UnsetMetrics(1),
   ApplicationState( ApplicationLifecycle::State::New ),
   TheSolverManager( ManagerOfSolvers )
 {
   RegisterHandler( this, &MetricUpdater::AddMetricSubscription );
   RegisterHandler( this, &MetricUpdater::UpdateMetricValue     );
-  RegisterHandler( this, &MetricUpdater::SLOViolationHandler   );
   RegisterHandler( this, &MetricUpdater::LifecycleHandler      );
-
+  RegisterHandler( this, &MetricUpdater::SLOViolationHandler   );
+  
   Send( Theron::AMQ::NetworkLayer::TopicSubscription(
     Theron::AMQ::NetworkLayer::TopicSubscription::Action::Subscription,
     MetricTopic::AMQTopic ), 

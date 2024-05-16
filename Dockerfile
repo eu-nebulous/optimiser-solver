@@ -11,7 +11,7 @@ RUN mkdir -p /solver
 WORKDIR /solver
 
 # Development framework, dependencies
-RUN dnf --assumeyes install gcc-c++-13.2.1-7.fc39 make-1:4.4.1-2.fc39 git-core-2.44.0-1.fc39 boost-devel-1.81.0-8.fc39 ccache-4.8.2-2.fc39 qpid-proton-cpp-devel-0.38.0-4.fc39 json-c-0.17-1.fc39 json-devel-3.11.2-3.fc39 json-glib-1.8.0-1.fc39 jsoncpp-1.9.5-5.fc39 jsoncpp-devel-1.9.5-5.fc39 coin-or-Couenne-0.5.8-12.fc39 wget-1.21.3-7.fc39 && \
+RUN dnf --assumeyes install gcc-c++-13.2.1-7.fc39 make-1:4.4.1-2.fc39 git-core-2.45.0-1.fc39 boost-devel-1.81.0-8.fc39 ccache-4.8.2-2.fc39 qpid-proton-cpp-devel-0.38.0-4.fc39 json-c-0.17-1.fc39 json-devel-3.11.2-3.fc39 json-glib-1.8.0-1.fc39 jsoncpp-1.9.5-5.fc39 jsoncpp-devel-1.9.5-5.fc39 coin-or-Couenne-0.5.8-12.fc39 wget-1.21.3-7.fc39 && \
     dnf clean all && \
     git clone https://github.com/jarro2783/cxxopts.git CxxOpts && \
     git clone https://github.com/GeirHo/TheronPlusPlus.git Theron++ && \
