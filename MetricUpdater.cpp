@@ -298,9 +298,9 @@ MetricUpdater::MetricUpdater( const std::string UpdaterName,
 {
   RegisterHandler( this, &MetricUpdater::AddMetricSubscription );
   RegisterHandler( this, &MetricUpdater::UpdateMetricValue     );
+  RegisterHandler( this, &MetricUpdater::LifecycleHandler      );
   RegisterHandler( this, &MetricUpdater::SLOViolationHandler   );
-  RegisterHandler( this, &MetricUpdater::ReconfigurationDone   );
-
+  
   Send( Theron::AMQ::NetworkLayer::TopicSubscription(
     Theron::AMQ::NetworkLayer::TopicSubscription::Action::Subscription,
     MetricTopic::AMQTopic ), 
@@ -308,7 +308,7 @@ MetricUpdater::MetricUpdater( const std::string UpdaterName,
 
   Send( Theron::AMQ::NetworkLayer::TopicSubscription(
     Theron::AMQ::NetworkLayer::TopicSubscription::Action::Subscription,
-    ReconfigurationMessage::AMQTopic ), 
+    ApplicationLifecycle::AMQTopic ), 
     GetSessionLayerAddress() );
 
   Send( Theron::AMQ::NetworkLayer::TopicSubscription(
@@ -333,7 +333,7 @@ MetricUpdater::~MetricUpdater()
 
     Send( Theron::AMQ::NetworkLayer::TopicSubscription(
       Theron::AMQ::NetworkLayer::TopicSubscription::Action::CloseSubscription,
-      ReconfigurationMessage::AMQTopic ), 
+      ApplicationLifecycle::AMQTopic ), 
       GetSessionLayerAddress() );
 
     Send( Theron::AMQ::NetworkLayer::TopicSubscription(
