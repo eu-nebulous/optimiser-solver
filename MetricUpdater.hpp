@@ -110,14 +110,14 @@ private:
 
   Solver::TimePointType ValidityTime;
 
-  // When an SLO violation message is received the current vector of metric 
-  // values should be sent as an application execution context (message) to the
-  // Solution Manager actor that will invoke a solver to find the optimal 
-  // configuration for this configuration. The Metric Updater must therefore 
-  // know the address of the Soler Manager, and this must be passed to 
-  // the constructor.
+  // The metric context is not complete before at least one value has been 
+  // received for each metric. It is therefore a counter keeping track of 
+  // metric values that are defined, but has not yet seen their first value 
+  // update. An SLO violation message will only result in the triggering of 
+  // a serch for a solution if all metric values have a value so that a 
+  // proper metric context can be forwarded to the solver.
 
-  bool AllMetricValuesSet;
+  unsigned int UnsetMetrics;
 
   // --------------------------------------------------------------------------
   // Subscribing to metric prediction values
@@ -224,6 +224,74 @@ private:
 
   void UpdateMetricValue( const MetricValueUpdate & TheMetricValue, 
                           const Address TheMetricTopic );
+
+  // --------------------------------------------------------------------------
+  // Application lifecycle
+  // --------------------------------------------------------------------------
+  //
+  // There is a message from the Optimiser Controller when the status of the 
+  // application changes. The state communicated in this message shows the 
+  // current state of the application and decides how the Solver will act to
+  // SLO Violations detected.
+
+  class ApplicationLifecycle
+  : public Theron::AMQ::JSONTopicMessage
+  { 
+  public:
+
+    // The topic for the reconfiguration finished messages is defined by the 
+    // optimiser as the sender.
+
+    static constexpr std::string_view AMQTopic
+                     = "eu.nebulouscloud.optimiser.controller.app_state";
+
+    // The state of the application goes from the the initial creation of 
+    // the cluster to deployments covering reconfigurations. Note that there is
+    // no state indicating that the application has terminated.
+
+    enum class State
+    {
+      New,        // Waiting for the utility evaluator
+      Ready,      // The application is ready for deployment
+      Deploying,  // The application is being deployed or redeployed
+      Running,    // The application is running
+      Failed     // The application is in an invalid state
+    };
+
+    // An arriving lifecycle message indicates a change in state and it is 
+    // therefore a way to set a state variable directly from the message by
+    // a cast operator
+
+    operator State() const;
+
+    // Constructors and destructor
+
+    ApplicationLifecycle( void )
+    : JSONTopicMessage( AMQTopic )
+    {}
+
+    ApplicationLifecycle( const ApplicationLifecycle & Other )
+    : JSONTopicMessage( Other )
+    {}
+
+    virtual ~ApplicationLifecycle() = default;
+  };
+
+  // After starting a reconfiguration with an SLO Violation, one should not 
+  // initiate another reconfiguration because the state may the possibly be 
+  // inconsistent with the SLO Violation Detector belieivng that the old 
+  // configuration is still in effect while the new configuration is being 
+  // enacted. The application lifecycle state must therefore be marked as 
+  // running before the another SLO Violation will trigger the next 
+  // reconfiguration
+
+  ApplicationLifecycle::State ApplicationState;
+
+  // The handler for the lifecycle message simply updates this variable by 
+  // setting it to the state received in the lifecycle message.
+
+  void LifecycleHandler( const ApplicationLifecycle & TheState, 
+                         const Address TheLifecycleTopic );
 
   // --------------------------------------------------------------------------
   // SLO violations
