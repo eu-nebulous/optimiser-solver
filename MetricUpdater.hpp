@@ -255,7 +255,7 @@ private:
       Ready,      // The application is ready for deployment
       Deploying,  // The application is being deployed or redeployed
       Running,    // The application is running
-      Failed     // The application is in an invalid state
+      Failed      // The application is in an invalid state
     };
 
     // An arriving lifecycle message indicates a change in state and it is 
@@ -263,6 +263,36 @@ private:
     // a cast operator
 
     operator State() const;
+
+    // There is a need to be able to report the current state of the 
+    // application in textual form, and it is therefore an inverse mapping
+    // that takes the application state and prints it out as a string to 
+    // the given output stream. 
+
+    friend std::ostream & operator << ( std::ostream & Output, 
+                                        const State ApplicationState )
+    {
+      switch ( ApplicationState )
+      {
+        case State::Deploying :
+          Output << "Deploying";
+          break;
+        case State::Failed :
+          Output << "Failed";
+          break;
+        case State::New :
+          Output << "New";
+          break;
+        case State::Ready :
+          Output << "Ready";
+          break;
+        case State::Running :
+          Output << "Running";
+          break;
+      }
+
+      return Output;
+    }
 
     // Constructors and destructor
 
