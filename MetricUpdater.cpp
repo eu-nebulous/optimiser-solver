@@ -261,6 +261,7 @@ void MetricUpdater::SLOViolationHandler(
   {
     Output << "... failed to forward the application execution context (size: " 
            << MetricValues.size() << "," << " Unset: " << UnsetMetrics 
+           << " Application state: " << ApplicationState
            << ")" << std::endl;
 
     if( MetricValues.empty() )

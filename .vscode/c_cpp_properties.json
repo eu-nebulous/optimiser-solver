@@ -3,16 +3,16 @@
         {
             "name": "Linux",
             "includePath": [
-                "/home/GHo/Documents/Code/NebulOuS/Solvers/",
+                "${workspaceFolder}/**",
+                "/usr/include/c++/14/",
+                "/usr/include/linux/",
+                "/home/GHo/Documents/Code/NebulOuS/Solver/",
                 "/home/GHo/Documents/Code/Theron++/",
                 "/home/GHo/Documents/Code/CxxOpts/include/",
-                "/opt/AMPL/amplapi/include",
-                "${workspaceFolder}/**",
-                "/usr/include/c++/13/",
-                "/usr/include/linux/"
+                "/opt/AMPL/amplapi/include"
             ],
             "defines": [],
-            "cStandard": "gnu23",
+            "cStandard": "c23",
             "intelliSenseMode": "linux-gcc-x64",
             "compilerPath": "/usr/lib64/ccache/g++",
             "compilerArgs": [
@@ -27,11 +27,11 @@
             "configurationProvider": "ms-vscode.makefile-tools",
             "browse": {
                 "path": [
-                    "/home/GHo/Documents/Code/NebulOuS/Solvers",
+                    "/home/GHo/Documents/Code/NebulOuS/Solver",
                     "/home/GHo/Documents/Code/Theron++/",
                     "/home/GHo/Documents/Code/CxxOpts/include/",
                     "/opt/AMPL/amplapi/include/",
-                    "/usr/include/c++/13/",
+                    "/usr/include/c++/14/",
                     "/usr/include/linux/"
                 ],
                 "limitSymbolsToIncludedHeaders": false
