@@ -41,6 +41,9 @@ std::string AMPLSolver::SaveFile( std::string_view TheName,
                       
   if( TheFile.is_open() )
   {
+    Theron::ConsoleOutput Output;
+    Output << "AMPL Solver saving the file: " <<  TheFileName << std::endl;
+
     TheFile << TheContent;
     TheFile.close();
     return TheFileName;
