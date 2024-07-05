@@ -187,8 +187,24 @@ int main( int NumberOfCLIOptions, char ** CLIOptionStrings )
 
   std::filesystem::path ModelDirectory( CLIValues["ModelDir"].as<std::string>() );
 
-  if( ModelDirectory.empty() || !std::filesystem::exists( ModelDirectory ) )
+  if( ModelDirectory.empty() ) 
     ModelDirectory = std::filesystem::temp_directory_path();
+  else if ( !std::filesystem::exists( ModelDirectory ) )
+  {
+    if( !std::filesystem::create_directory( ModelDirectory ) )
+    {
+      std::source_location Location = std::source_location::current();
+      std::ostringstream ErrorMessage;
+
+      ErrorMessage  << "[" << Location.file_name() << " at line " 
+                    << Location.line() << "in function " 
+                    << Location.function_name() <<"] " 
+                    << "The requested model directory " << ModelDirectory
+                    << " does not exist and cannot be created";
+
+      throw std::runtime_error( ErrorMessage.str() );
+    }
+  }
 
 // --------------------------------------------------------------------------
   // AMQ options
