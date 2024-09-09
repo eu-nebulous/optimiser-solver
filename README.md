@@ -188,7 +188,7 @@ The three concurrent actors are implemented as  [Theron++](https://github.com/Ge
 
 The Solver Component actors and the Theron++ library uses features of the latest version of the [C++ standard](https://isocpp.org/) and its standard template library, now C++23. It should therefore be possible to compile the Solver Component with any recent compatible compiler.
 
-The AMPL Solver actor uses the [AMPL C++ Application Programming Interface (API)](https://ampl.com/api/latest/cpp/) to parse and interpret the constraint optimisation problem file, and to call the back-end mathematical programme solvers
+The AMPL Solver actor uses the [AMPL C++ Application Programming Interface (API)](https://ampl.com/api/latest/cpp/) to parse and interpret the constraint optimisation problem file, and to call the back-end mathematical program solvers
 
 ##  License
 The software is copyleft open source provided under the [Mozilla Public License version 2.0](https://www.mozilla.org/en-US/MPL/2.0/).
