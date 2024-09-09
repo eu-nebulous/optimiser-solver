@@ -14,7 +14,8 @@ The solver component consists of three concurrent [Actors](https://en.wikipedia.
 * The **AMPL Solver** implementing the mathematical solver finding the configuration that maximises the utility function for the provided application execution context. A Mathematical Programming Language ([AMPL](https://ampl.com/)) is used to formulate the constraint mathematical programming problem calling a back end mathematical solver. Many different solvers can be used, both commercial and open source, and the current implementation uses the open source solver [Couenne](https://github.com/coin-or/Couenne) from the [Computational Infrastructure for Operations Research (COIN-OR)](https://www.coin-or.org/).
 
 A Class-Actor-Communication diagram is shwon below. The green components are other parts of the NebulOuS Optimizer module, and the gray components are other NebulOuS componts intaracting with the Solver Component. 
-![Class - Actor - Communication diagram for the Solver Component](Optimizer architecture-Solver.drawio.png) 
+
+![Architecture diagram](https://github.com/eu-nebulous/optimiser-solver/blob/main/Optimizer%20architecture-Solver.drawio.png)
 
 
 ## Messages
