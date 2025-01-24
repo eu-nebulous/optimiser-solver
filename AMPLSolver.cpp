@@ -361,15 +361,20 @@ void AMPLSolver::SolveProblem(
   }
 
   // The found solution can then be returned to the requesting actor or topic
+  // and printed to the console for debugging purposes. This implies that 
+  // the message must be stored separately.
 
-  Send( Solver::Solution( 
+  Solver::Solution SolutionMessage( 
     TheContext.at( 
       Solver::Solution::Keys::TimeStamp ).get< Solver::TimePointType >(),
     OptimisationGoal, ObjectiveValues, VariableValues, 
     DeploymentFlagSet
-  ), TheRequester ); 
+  );
 
-  Output << "Solver found a solution" << std::endl;
+  Send( SolutionMessage, TheRequester ); 
+
+  Output << "Solver found a solution:" << std::endl
+         << SolutionMessage.dump() << std::endl;
 }
 
 // -----------------------------------------------------------------------------
