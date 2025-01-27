@@ -368,13 +368,12 @@ void AMPLSolver::SolveProblem(
     TheContext.at( 
       Solver::Solution::Keys::TimeStamp ).get< Solver::TimePointType >(),
     OptimisationGoal, ObjectiveValues, VariableValues, 
-    DeploymentFlagSet
-  );
+    DeploymentFlagSet );
 
   Send( SolutionMessage, TheRequester ); 
 
   Output << "Solver found a solution:" << std::endl
-         << SolutionMessage.dump() << std::endl;
+         << SolutionMessage.dump(2) << std::endl;
 }
 
 // -----------------------------------------------------------------------------
