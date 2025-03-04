@@ -67,7 +67,7 @@ public:
   // The algorithms must correspond to actors implementing trainers for the 
   // various regression functions.
   
-  enum class Algorithms
+  enum class Algorithm
   {
     LinearRegression,
     SupportVectorRegression,
@@ -102,7 +102,7 @@ private:
       ~PerformanceIndicator() = default;
 
       PerformanceIndicator( const std::string InidcatorName, 
-                            Algorithms RegressionType );
+                            Algorithm RegressionType );
   };
 
   // The performance indicators are stored in an unordered map where the name of the
@@ -132,7 +132,7 @@ public:
   // can only be posted once and an exception will be thrown if the regression 
   // names are not empty when this function is called. 
 
-  void SetRegressorNames( std::vector< std::string > & TheNames );
+  void SetRegressorNames( const std::vector< std::string > & TheNames );
 
   // There is a function to define a new performance indicator. This will create
   // the trainer for the regression function of the right type. Note that this
@@ -140,7 +140,7 @@ public:
   // through an exception if the regrssor names are not given.
 
   void NewPerformanceIndicator( const std::string IndicatorName, 
-                                Algorithms RegressionType  );
+                                Algorithm RegressionType  );
 
   // When the regression function has been defined for a performance indicator
   // the value can be found by calling the value function with a given set of 
@@ -180,6 +180,26 @@ public:
   void StoreRegressionFunction( const NewRegressionFunction & TheFunction, 
                                 const Address RegressionTrainer ) 
   { PerformanceIndicators.at( TheFunction.IndicatorName ).UpdateFunction( TheFunction.TheFunction ); }
+
+  // There are also message handlers for the regressor names and the performance
+  // indicators for the situation where these can be defined by the AMPL solver 
+  // actor. These will call the corresponding interface functions.
+
+  void StoreRegressorNames( const std::vector< std::string > & TheNames, 
+                            const Address TheAMPLSolver )
+  { SetRegressorNames( TheNames ); } 
+
+  // For the performance indicators, they can all be set with one message, and
+  // this will be done by sending an unordered map.
+
+  void StorePerformanceIndicators( const std::unordered_map< std::string, Algorithm > & TheIndicators, 
+                                   const Address TheAMPLSolver )
+  {
+    for( const auto & [ IndicatorName, RegressionType ] : TheIndicators )
+      NewPerformanceIndicator( IndicatorName, RegressionType );
+  }
+
+  
   
   // --------------------------------------------------------------------------
   // Constructor and destructor
@@ -192,10 +212,18 @@ public:
   : Actor( EvaluatorName ),
     StandardFallbackHandler( Actor::GetAddress().AsString() ),
     PerformanceIndicators(), RegressorNames()
-  { RegisterHandler( this, &RegressionEvaluator::StoreRegressionFunction ); }
+  { 
+    RegisterHandler( this, &RegressionEvaluator::StoreRegressionFunction ); 
+    RegisterHandler( this, &RegressionEvaluator::StoreRegressorNames );
+    RegisterHandler( this, &RegressionEvaluator::StorePerformanceIndicators );
+  }
 
   ~RegressionEvaluator( void )
-  { DeregisterHandler( this, &RegressionEvaluator::StoreRegressionFunction ); }
+  { 
+    DeregisterHandler( this, &RegressionEvaluator::StoreRegressionFunction ); 
+    DeregisterHandler( this, &RegressionEvaluator::StoreRegressorNames );
+    DeregisterHandler( this, &RegressionEvaluator::StorePerformanceIndicators );
+  }
 };
 
 }

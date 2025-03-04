@@ -42,7 +42,7 @@ namespace NebulOuS
 // particular problem 
 
 void RegressionEvaluator::SetRegressorNames( 
-		 std::vector< std::string > & TheNames )
+		 const std::vector< std::string > & TheNames )
 {
 	if ( RegressorNames.empty() )
 		RegressorNames.assign( TheNames.begin(), TheNames.end() );
@@ -65,7 +65,7 @@ void RegressionEvaluator::SetRegressorNames(
 // names have been given as this will lead to an exception.
 
 void RegressionEvaluator::NewPerformanceIndicator( 
-		 const std::string IndicatorName, Algorithms RegressionType )
+		 const std::string IndicatorName, Algorithm RegressionType )
 {
 	// First assert that new performance indicators can be defined
 
@@ -111,5 +111,32 @@ void RegressionEvaluator::NewPerformanceIndicator(
 
 NebulOuS::RegressionEvaluator TheRegressionEvaluator( "RegressionEvaluator" );
 
+// The various functions called from AMPL are violating the Actor model, because
+// they will directly call the interface functions of the RegressionEvaluator
+// class. This is possible since the operations are "read-only" and will not
+// change the state of the actor. 
+
+extern "C"
+{
+
+// The first function is used to compute the value of a performance indicator
+// for a given set of regressor values. 
+
+double PIValue( amplp::arglist * args )
+{
+	// The first argument is the name of the performance indicator
+
+	std::string IndicatorName( *(args->sa) );
+
+	// The second argument is the list of regressor values
+
+	std::vector< double > RegressorValues( args->ra, args->ra + args->nr );
+
+	// The value is found by calling the value function of the performance
+	// indicator with the given regressor values.
+
+	return TheRegressionEvaluator.Value( IndicatorName, RegressorValues );
+}
 
 
+} // End extern "C"
