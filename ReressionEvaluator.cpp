@@ -33,6 +33,23 @@ License: MPL2.0 (https://www.mozilla.org/en-US/MPL/2.0/)
 namespace NebulOuS
 {
 // --------------------------------------------------------------------------
+// Utility functions
+// --------------------------------------------------------------------------
+
+RegressionEvaluator::Algorithm 
+RegressionEvaluator::String2Algorithm ( const std::string AlgorithmName )
+{
+  static std::map< std::string, Algorithm > 
+	RegressionAlgorithms{
+	    {"LinearRegression", Algorithm::LinearRegression},
+      {"SupportVectorRegression", Algorithm::SupportVectorRegression},
+      {"ProjectionPursuitRegression", Algorithm::ProjectionPursuitRegression}
+    };
+
+    return RegressionAlgorithms.at( AlgorithmName );
+  }
+
+// --------------------------------------------------------------------------
 // Interface functions
 // --------------------------------------------------------------------------
 //
@@ -95,6 +112,35 @@ void RegressionEvaluator::NewPerformanceIndicator(
 	PerformanceIndicators.emplace( IndicatorName, RegressionType );
 }
 
+// --------------------------------------------------------------------------
+// Message handlers
+// --------------------------------------------------------------------------
+//
+// When an updated regression function is received, it is stored in the
+// performance indicator map. 
+
+void RegressionEvaluator::StoreRegressionFunction( 
+			const NewRegressionFunction & TheFunction, 	const Address RegressionTrainer ) 
+{ PerformanceIndicators.at( TheFunction.IndicatorName )
+											 .UpdateFunction( TheFunction.TheFunction ); }
+
+// The regressor names are set by the AMPL solver actor, and this is done by
+// sending a message with the names.
+
+void RegressionEvaluator::StoreRegressorNames( 
+			const std::vector< std::string > & TheNames, const Address TheAMPLSolver )
+{ SetRegressorNames( TheNames ); }
+
+// The performance indicators are set by the AMPL solver actor, and this is done
+// by sending a message with the names and types of the performance indicators.
+
+void RegressionEvaluator::StorePerformanceIndicators( 
+			const std::unordered_map< std::string, Algorithm > & TheIndicators, 
+			const Address TheAMPLSolver )
+{
+	for ( const auto & [ IndicatorName, RegressionType ] : TheIndicators )
+		NewPerformanceIndicator( IndicatorName, RegressionType );
+
 } // End name space NebulOuS
 
 /*==============================================================================
@@ -138,5 +184,23 @@ double PIValue( amplp::arglist * args )
 	return TheRegressionEvaluator.Value( IndicatorName, RegressorValues );
 }
 
+// The performance indices can be defined one by one from the AMPL model
+
+void NewPI( amplp::arglist * args )
+{
+	// The first argument is the name of the performance indicator
+
+	std::string IndicatorName( *(args->sa) );
+
+	// The second argument is the type of regression function
+
+	RegressionEvaluator::Algorithm 
+	RegressionType( RegressionEvaluator::String2Algorithm ( *(args->sa+1) ) );
+
+	// The performance indicator is defined by calling the NewPerformanceIndicator
+	// function of the RegressionEvaluator class.
+
+	TheRegressionEvaluator.NewPerformanceIndicator( IndicatorName, RegressionType );
+}
 
 } // End extern "C"

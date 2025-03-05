@@ -74,6 +74,10 @@ public:
     ProjectionPursuitRegression
   };
 
+  // There is also a conversion function from string to algorithm.
+
+  static Algorithm String2Algorithm ( const std::string AlgorithmName );
+  
 private:
 
   // --------------------------------------------------------------------------
@@ -164,8 +168,8 @@ public:
   {
     public:
 
-      std::string IndicatorName;
-      std::shared_ptr< RegressionFunction > TheFunction;
+      const std::string IndicatorName;
+      const std::shared_ptr< RegressionFunction > TheFunction;
 
       NewRegressionFunction( const std::string Name, 
                              std::shared_ptr< RegressionFunction > Function )
@@ -178,29 +182,22 @@ public:
   // in the performance indicator map.
 
   void StoreRegressionFunction( const NewRegressionFunction & TheFunction, 
-                                const Address RegressionTrainer ) 
-  { PerformanceIndicators.at( TheFunction.IndicatorName ).UpdateFunction( TheFunction.TheFunction ); }
-
+                                const Address RegressionTrainer );
+  
   // There are also message handlers for the regressor names and the performance
   // indicators for the situation where these can be defined by the AMPL solver 
   // actor. These will call the corresponding interface functions.
 
   void StoreRegressorNames( const std::vector< std::string > & TheNames, 
-                            const Address TheAMPLSolver )
-  { SetRegressorNames( TheNames ); } 
-
+                            const Address TheAMPLSolver );
+  
   // For the performance indicators, they can all be set with one message, and
   // this will be done by sending an unordered map.
 
-  void StorePerformanceIndicators( const std::unordered_map< std::string, Algorithm > & TheIndicators, 
-                                   const Address TheAMPLSolver )
-  {
-    for( const auto & [ IndicatorName, RegressionType ] : TheIndicators )
-      NewPerformanceIndicator( IndicatorName, RegressionType );
-  }
+  void StorePerformanceIndicators( 
+       const std::unordered_map< std::string, Algorithm > & TheIndicators, 
+       const Address TheAMPLSolver );
 
-  
-  
   // --------------------------------------------------------------------------
   // Constructor and destructor
   // --------------------------------------------------------------------------
