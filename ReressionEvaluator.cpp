@@ -35,15 +35,22 @@ namespace NebulOuS
 // --------------------------------------------------------------------------
 // Utility functions
 // --------------------------------------------------------------------------
+//
+// The first utility function converts a string to an algorithm type. This is
+// used when the performance indicators are defined from the AMPL model. Both
+// the full name and the abbreviation are accepted.
 
 RegressionEvaluator::Algorithm 
 RegressionEvaluator::String2Algorithm ( const std::string AlgorithmName )
 {
   static std::map< std::string, Algorithm > 
 	RegressionAlgorithms{
-	    {"LinearRegression", Algorithm::LinearRegression},
-      {"SupportVectorRegression", Algorithm::SupportVectorRegression},
-      {"ProjectionPursuitRegression", Algorithm::ProjectionPursuitRegression}
+	    {"Linear Regression", Algorithm::LinearRegression},
+			{"LR", Algorithm::LinearRegression},
+      {"Support Vector Regression", Algorithm::SupportVectorRegression},
+			{"SVR", Algorithm::SupportVectorRegression},
+      {"Projection Pursuit Regression", Algorithm::ProjectionPursuitRegression}
+			{"PPR", Algorithm::ProjectionPursuitRegression}
     };
 
     return RegressionAlgorithms.at( AlgorithmName );
