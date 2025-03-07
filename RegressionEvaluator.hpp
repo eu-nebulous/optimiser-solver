@@ -114,6 +114,13 @@ private:
 
   std::unordered_map< std::string, PerformanceIndicator > PerformanceIndicators;
 
+  // There is a function to check if a performance indicator is defined.
+
+public:
+
+  inline bool HasPerformanceIndicator( const std::string IndicatorName ) const
+  { return PerformanceIndicators.contains( IndicatorName ); }
+
   // --------------------------------------------------------------------------
   // Regressor names
   // --------------------------------------------------------------------------
@@ -122,9 +129,16 @@ private:
   // passed on to the regression function trainers. The variable names should 
   // be given first, and then the names of the used metrics.
 
+private:
+
   std::vector< std::string > RegressorNames;
 
 public:
+
+  // There is a public function to get the number of regressors.
+
+  inline std::vector< std::string>::size_type GetNumberOfRegressors( void ) const
+  { return RegressorNames.size(); }
 
   // --------------------------------------------------------------------------
   // Interface functions

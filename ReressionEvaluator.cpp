@@ -18,8 +18,8 @@ License: MPL2.0 (https://www.mozilla.org/en-US/MPL/2.0/)
 
 // Standard headars
 
-#include <sstream>											// Formatted error messages
-#include <stdexcept>										// Standard exceptions
+#include <sstream>						// Formatted error messages
+#include <stdexcept>					// Standard exceptions
 #include <source_location>              // Informative error messages
 
 // NebulOuS specific headers
@@ -28,7 +28,7 @@ License: MPL2.0 (https://www.mozilla.org/en-US/MPL/2.0/)
 
 // AMLP specific headers
 
-#include "amplp.hpp"										// AMPL interface
+#include "amplp.hpp"					// AMPL interface
 
 namespace NebulOuS
 {
@@ -46,11 +46,11 @@ RegressionEvaluator::String2Algorithm ( const std::string AlgorithmName )
   static std::map< std::string, Algorithm > 
 	RegressionAlgorithms{
 	    {"Linear Regression", Algorithm::LinearRegression},
-			{"LR", Algorithm::LinearRegression},
-      {"Support Vector Regression", Algorithm::SupportVectorRegression},
-			{"SVR", Algorithm::SupportVectorRegression},
-      {"Projection Pursuit Regression", Algorithm::ProjectionPursuitRegression}
-			{"PPR", Algorithm::ProjectionPursuitRegression}
+		{"LR", Algorithm::LinearRegression},
+      	{"Support Vector Regression", Algorithm::SupportVectorRegression},
+		{"SVR", Algorithm::SupportVectorRegression},
+      	{"Projection Pursuit Regression", Algorithm::ProjectionPursuitRegression},
+		{"PPR", Algorithm::ProjectionPursuitRegression}
     };
 
     return RegressionAlgorithms.at( AlgorithmName );
@@ -147,6 +147,7 @@ void RegressionEvaluator::StorePerformanceIndicators(
 {
 	for ( const auto & [ IndicatorName, RegressionType ] : TheIndicators )
 		NewPerformanceIndicator( IndicatorName, RegressionType );
+}
 
 } // End name space NebulOuS
 
@@ -175,13 +176,63 @@ extern "C"
 // The first function is used to compute the value of a performance indicator
 // for a given set of regressor values. 
 
-double PIValue( amplp::arglist * args )
+double Value( amplp::arglist * args )
 {
 	// The first argument is the name of the performance indicator
 
-	std::string IndicatorName( *(args->sa) );
+	std::string IndicatorName;
 
-	// The second argument is the list of regressor values
+	// The indicator name must be a valid name
+
+	if ( args->sa == nullptr )
+	{
+		std::source_location Location = std::source_location::current();
+		std::ostringstream ErrorMessage;
+
+		ErrorMessage << "[" << Location.file_name() << " at line " 
+					 << Location.line() << " in function " 
+					 << Location.function_name() <<"] " 
+					 << "The performance indicator name is missing";
+
+		throw std::invalid_argument( ErrorMessage.str() );
+	}
+	else
+	{
+		IndicatorName = *(args->sa);
+
+		if ( !TheRegressionEvaluator.HasPerformanceIndicator( IndicatorName ) )
+		{
+			std::source_location Location = std::source_location::current();
+			std::ostringstream ErrorMessage;
+
+			ErrorMessage << "[" << Location.file_name() << " at line " 
+						 << Location.line() << " in function " 
+						 << Location.function_name() <<"] " 
+						 << "The performance indicator " << IndicatorName 
+						 << " is not defined";
+
+			throw std::invalid_argument( ErrorMessage.str() );
+		}
+	}
+
+	// The argument is valid if the right number of regressor values.
+
+	if ( args->nr != TheRegressionEvaluator.GetNumberOfRegressors() )
+	{
+		std::source_location Location = std::source_location::current();
+		std::ostringstream ErrorMessage;
+
+		ErrorMessage << "[" << Location.file_name() << " at line " 
+					 << Location.line() << " in function " 
+					 << Location.function_name() <<"] " 
+					 << "The number of regressor values does not match "
+					 << "the number of registered regressors";
+
+		throw std::invalid_argument( ErrorMessage.str() );
+	}
+
+	// The regressor values are copied to a vector to be passed to the value
+	// function of the performance indicator.
 
 	std::vector< double > RegressorValues( args->ra, args->ra + args->nr );
 
@@ -193,9 +244,25 @@ double PIValue( amplp::arglist * args )
 
 // The performance indices can be defined one by one from the AMPL model
 
-void NewPI( amplp::arglist * args )
+void NewPerformanceIndicator( amplp::arglist * args )
 {
-	// The first argument is the name of the performance indicator
+	// The function must be called with two string (symbolic) arguments
+
+	if ( args->nsin != 2 )
+	{
+		std::source_location Location = std::source_location::current();
+		std::ostringstream ErrorMessage;
+
+		ErrorMessage << "[" << Location.file_name() << " at line " 
+					 << Location.line() << " in function " 
+					 << Location.function_name() <<"] " 
+					 << "The function New Performance Indicator must be "
+					 << "called with two arguments";
+
+		throw std::invalid_argument( ErrorMessage.str() );
+	}
+
+	// The first argument is the name of the performance indicator 
 
 	std::string IndicatorName( *(args->sa) );
 
@@ -208,6 +275,65 @@ void NewPI( amplp::arglist * args )
 	// function of the RegressionEvaluator class.
 
 	TheRegressionEvaluator.NewPerformanceIndicator( IndicatorName, RegressionType );
+}
+
+// The regressor names can also be defined from the AMPL model directly
+
+void SetRegressorNames( amplp::arglist * args )
+{
+	// The function must be called with at least one string (symbolic) argument
+
+	if ( args->nsin < 1 )
+	{
+		std::source_location Location = std::source_location::current();
+		std::ostringstream ErrorMessage;
+
+		ErrorMessage << "[" << Location.file_name() << " at line " 
+					 << Location.line() << " in function " 
+					 << Location.function_name() <<"] " 
+					 << "The function Set Regressor Names must be called with "
+					 << "at least one argument";
+
+		throw std::invalid_argument( ErrorMessage.str() );
+	}
+
+	// The regressor names are copied to a vector to be passed to the 
+	// SetRegressorNames function of the RegressionEvaluator class.
+
+	std::vector< std::string > RegressorNames( args->sa, args->sa + args->nsin );
+
+	TheRegressionEvaluator.SetRegressorNames( RegressorNames );
+}
+
+// Finally, the global functions are registered with the AMPL solver interface 
+// so that they can be called from the AMPL model.
+
+void funcadd( amplp::AmplExports *ae )
+{
+	// Arg 3, called type, must satisfy 0 <= type <= 6:
+ 	// type&1 == 0:	0,2,4,6	==> force all arguments to be numeric.
+ 	// type&1 == 1:	1,3,5	==> pass both symbolic and numeric arguments.
+ 	// type&6 == 0:	0,1	==> the function is real valued.
+ 	// type&6 == 2:	2,3	==> the function is char * valued; static storage
+	//			    suffices: AMPL copies the return value.
+ 	// type&6 == 4:	4,5	==> the function is random (real valued).
+ 	// type&6 == 6: 6	==> random, real valued, pass nargs real args,
+ 	//				0 <= nargs <= 2.
+ 	//
+ 	//  Arg 4, called nargs, is interpretted as follows:
+ 	//	>=  0 ==> the function has exactly nargs arguments
+ 	//	<= -1 ==> the function has >= -(nargs+1) arguments.
+ 	//
+ 	// Arg 5, called funcinfo, is copied without change to the arglist
+ 	//	structure passed to the function; funcinfo is for the
+ 	//	function to use or ignore as it sees fit.
+
+	ae->Addfunc("Value", Value, amplp::FUNCADD_double_VALUED | amplp::FUNCADD_STRING_ARGS,
+				-1, 0, ae);
+	ae->Addfunc("NewPerformanceIndicator", (amplp::rfunc) NewPerformanceIndicator,
+				amplp::FUNCADD_STRING_ARGS, 2, 0, ae);
+	ae->Addfunc("SetRegressorNames", (amplp::rfunc) SetRegressorNames,
+				amplp::FUNCADD_STRING_ARGS, -1, 0, ae);
 }
 
 } // End extern "C"
