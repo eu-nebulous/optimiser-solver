@@ -91,13 +91,13 @@ private:
   {
     private:
 
-      std::shared_ptr< RegressionFunction > ValueFunction;
-      std::shared_ptr< Theron::Actor >      FunctionTrainer;
+      std::unique_ptr< const RegressionFunction > ValueFunction;
+      std::unique_ptr< const Theron::Actor >      FunctionTrainer;
 
     public:
 
-      inline void UpdateFunction( std::shared_ptr< RegressionFunction > NewFunction )
-      { ValueFunction = NewFunction; }
+      inline void UpdateFunction( std::unique_ptr< const RegressionFunction > NewFunction )
+      { ValueFunction = std::move( NewFunction ); }
 
       inline double Value( std::vector< double > & RegressorValues )
       { return ValueFunction->operator()( RegressorValues ); }
@@ -183,11 +183,11 @@ public:
     public:
 
       const std::string IndicatorName;
-      const std::shared_ptr< RegressionFunction > TheFunction;
+      const std::unique_ptr< const RegressionFunction > TheFunction;
 
       NewRegressionFunction( const std::string Name, 
-                             std::shared_ptr< RegressionFunction > Function )
-      : IndicatorName( Name ), TheFunction( Function ) {};
+                             std::unique_ptr< const RegressionFunction > Function )
+      : IndicatorName( Name ), TheFunction( std::move( Function ) ) {};
 
       ~NewRegressionFunction() = default;
   };
