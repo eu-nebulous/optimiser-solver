@@ -268,8 +268,8 @@ void NewPerformanceIndicator( amplp::arglist * args )
 
 	// The second argument is the type of regression function
 
-	RegressionEvaluator::Algorithm 
-	RegressionType( RegressionEvaluator::String2Algorithm ( *(args->sa+1) ) );
+	NebulOuS::RegressionEvaluator::Algorithm RegressionType( 
+		NebulOuS::RegressionEvaluator::String2Algorithm ( *(args->sa+1) ) );
 
 	// The performance indicator is defined by calling the NewPerformanceIndicator
 	// function of the RegressionEvaluator class.

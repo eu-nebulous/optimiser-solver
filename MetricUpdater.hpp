@@ -222,8 +222,8 @@ private:
   // based on the given topic name. If there is no such metric known, then the
   // message will just be discarded.
 
-  void UpdateMetricValue( const MetricValueUpdate & TheMetricValue, 
-                          const Address TheMetricTopic );
+  virtual void UpdateMetricValue( const MetricValueUpdate & TheMetricValue, 
+                                  const Address TheMetricTopic );
 
   // --------------------------------------------------------------------------
   // Application lifecycle
