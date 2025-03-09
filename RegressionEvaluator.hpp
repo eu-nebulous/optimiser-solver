@@ -106,7 +106,8 @@ private:
       ~PerformanceIndicator() = default;
 
       PerformanceIndicator( const std::string InidcatorName, 
-                            Algorithm RegressionType );
+                            Algorithm RegressionType,
+                            const std::vector< std::string > & RegressorNames );
   };
 
   // The performance indicators are stored in an unordered map where the name of the
