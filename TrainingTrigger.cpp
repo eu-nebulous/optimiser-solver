@@ -48,7 +48,12 @@ void TrainingTrigger::NewSubscription( const unsigned long & TheTriggerCount,
   if ( TheTriggerCount == 0 )
       TriggerSubscribers.erase( TheTrainer );
   else
+  {
       TriggerSubscribers[ TheTrainer ] = TheTriggerCount;
+
+      if ( MetricCounter > TheTriggerCount )
+          Send( RetrainRegression( MetricCounter ), TheTrainer );
+  }
 }
 
 // --------------------------------------------------------------------------
@@ -75,7 +80,7 @@ void TrainingTrigger::UpdateMetricValue(
   [ this ]( const auto & [ Trainer, TriggerCount ] )
   {
       if ( MetricCounter % TriggerCount == 0 )
-        Send( Trainer, RetrainRegression( MetricCounter ) );
+        Send( RetrainRegression( MetricCounter ), Trainer );
   } );
 }
 
