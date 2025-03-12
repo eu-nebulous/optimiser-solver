@@ -25,6 +25,7 @@ License: MPL2.0 (https://www.mozilla.org/en-US/MPL/2.0/)
 // NebulOuS specific headers
 
 #include "RegressionEvaluator.hpp"
+#include "RegressionFunctionCreator.hpp"
 
 // AMLP specific headers
 
@@ -55,6 +56,43 @@ RegressionEvaluator::String2Algorithm ( const std::string AlgorithmName )
 
     return RegressionAlgorithms.at( AlgorithmName );
   }
+
+// --------------------------------------------------------------------------
+// Creating Performance Indicators
+// --------------------------------------------------------------------------
+//
+// The constructor for the performance indicator class creates the regression
+// function creator for the requested algorithm type and sets the initial 
+// bootstrap regression function returnd by the actor.
+
+RegressionEvaluator::PerformanceIndicator::PerformanceIndicator(
+	const std::string InidcatorName, 
+	Algorithm RegressionType,
+	const std::vector< std::string > & RegressorNames,
+	Address TheTriggerActor, Address TheEvaluatorActor )
+{
+	switch ( RegressionType )
+	{
+		case Algorithm::LinearRegression :
+			FunctionTrainer = std::make_unique< LinearRegression >(
+				IndicatorName, TheTriggerActor, TheEvaluatorActor, RegressorNames );
+			break;
+		case Algorithm::SupportVectorRegression :
+			FunctionTrainer = std::make_unique< SupportVectorRegression >(
+				IndicatorName, TheTriggerActor, TheEvaluatorActor, RegressorNames );
+			break;
+		case Algorithm::ProjectionPursuitRegression :
+			FunctionTrainer = std::make_unique< ProjectionPursuitRegression >(
+				IndicatorName, TheTriggerActor, TheEvaluatorActor, RegressorNames );
+			break;
+	};
+
+	// After creating the right regression function training actor, its 
+	// default bootstrapping regression function is used until the trainer
+	// sends an updated version based on real measurement data.
+
+	ValueFunction = FunctionTrainer->BootstrapRegressionFunction();
+}
 
 // --------------------------------------------------------------------------
 // Interface functions
@@ -116,7 +154,8 @@ void RegressionEvaluator::NewPerformanceIndicator(
 	// Then one can construct the performance indicator with the given name and 
 	// type. The actual work is done by the performance indicator constructor
 
-	PerformanceIndicators.emplace( IndicatorName, RegressionType );
+	PerformanceIndicators.emplace( IndicatorName, RegressionType, RegressorNames,
+																 TheTriggerActor, GetAddress() );
 }
 
 // --------------------------------------------------------------------------
@@ -127,11 +166,13 @@ void RegressionEvaluator::NewPerformanceIndicator(
 // performance indicator map. 
 
 void RegressionEvaluator::StoreRegressionFunction( 
-			const NewRegressionFunction & TheFunction, 	const Address RegressionTrainer ) 
-{ PerformanceIndicators.at( TheFunction.IndicatorName )
-											 .UpdateFunction( TheFunction.TheFunction ); }
+		 const NewRegressionFunction & TheFunction, 	const Address RegressionTrainer ) 
+{ 
+	PerformanceIndicators.at( TheFunction.IndicatorName )
+											 .UpdateFunction( TheFunction.TheFunction );  
+}
 
-// The regressor names are set by the AMPL solver actor, and this is done by
+// The regressor names are set by the AMPL solver actor, and this isstd::move( done by
 // sending a message with the names.
 
 void RegressionEvaluator::StoreRegressorNames( 
@@ -215,7 +256,8 @@ double Value( amplp::arglist * args )
 		}
 	}
 
-	// The argument is valid if the right number of regressor values.
+	// The argument is valid if the right number of regressor values
+	// has been provided.
 
 	if ( args->nr != TheRegressionEvaluator.GetNumberOfRegressors() )
 	{

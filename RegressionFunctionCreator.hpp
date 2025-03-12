@@ -110,7 +110,7 @@ protected:
   // classes, by retruning the trained regression function in response to
   // a design matrix.
 
-  virtual std::unique_ptr< const RegressionEvaluator::RegressionFunction > 
+  virtual std::shared_ptr< const RegressionEvaluator::RegressionFunction > 
   TrainRegressionFunction( const DenseMatrix & TheDesignMatrix, 
                            const DenseVector & TheResponseVector ) = 0;
 
@@ -122,6 +122,22 @@ private:
 
   void RetrainRegression( const TrainingTrigger::RetrainRegression & TheTrigger, 
                           const Address TheTrainingTrigger );
+
+  // There is a bootstrapping problem since the model may request regression
+  // values before there are enough data to train the regression algorithm.
+  // In this case, some initial values may be guessed by analysing the 
+  // regressor values passed to the regression function. Hence, there is a 
+  // function returning an intial regression function that must be defined 
+  // by the specific algorithms. It is important that this intial regression
+  // function can be returned witout changing any internal state of the 
+  // regression function creator actor since it would otherwise violate the 
+  // actor model's assumption and could cause rase conditions with the normal
+  // operatin of the actor.
+
+public:
+
+  virtual std::shared_ptr< RegressionEvaluator::RegressionFunction >
+  BootstrapRegressionFunction( void ) const = 0;
 
   // --------------------------------------------------------------------------
   // Constructor and destructor
@@ -143,6 +159,197 @@ public:
   RegressionFunctionCreator( void ) = delete;
   RegressionFunctionCreator( const RegressionFunctionCreator & Other ) = delete;
   virtual ~RegressionFunctionCreator() = default;
+};
+
+/*==============================================================================
+
+Linear Regression
+
+==============================================================================*/
+//
+// The standard linear regression is implemented as a derived class of the
+// regression function creator. The linear regression is a simple linear model
+// that is trained by the method of least squares. The regression function is
+// a linear function of the regressor values, and the training is done by
+// solving the normal equations. The linear regression is a good starting point
+// for the regression function, and it is often used as a benchmark for more
+// complex models.
+
+class LinearRegression
+: virtual public Theron::Actor,
+  virtual public Theron::StandardFallbackHandler,
+  public RegressionFunctionCreator
+{
+  // --------------------------------------------------------------------------
+  // Training the linear regression function
+  // --------------------------------------------------------------------------
+  //
+  // The only function that needs to be imlemented by the class is the training
+  // function. The training function will solve the normal equations to obtain
+  // the regression coefficients. The function is called by the base class when
+  // the trigger for retraining is received.
+
+protected:
+
+  virtual std::shared_ptr< const RegressionEvaluator::RegressionFunction > 
+  TrainRegressionFunction( const DenseMatrix & TheDesignMatrix, 
+                           const DenseVector & TheResponseVector ) override;
+
+  // It is also necessary to provide a regression function that can bootstrap
+  // the creation process since the regression function creator actor may be 
+  // created beore there is sufficient data to train the regression function.
+
+public:
+
+  virtual std::shared_ptr< RegressionEvaluator::RegressionFunction >
+  BootstrapRegressionFunction( void ) const override;
+
+  // --------------------------------------------------------------------------
+  // Constructor
+  // --------------------------------------------------------------------------
+  //
+  // The constructor takes the name of the performance indicator for which the
+  // linear regression is trained. The constructor will set the trigger for
+  // retraining to zero, and register the handler for the retrain trigger.
+
+public:
+
+  LinearRegression( const std::string & PerformanceIndicatorName, 
+                    const Address TheTriggerActor, 
+                    const Address TheEvaluatorActor,
+                    const std::vector< std::string > & Names )
+  : Actor( PerformanceIndicatorName ),
+    StandardFallbackHandler( Actor::GetAddress().AsString() ),
+    RegressionFunctionCreator( Actor::GetAddress().AsString(), 
+                               TheTriggerActor, 
+                               TheEvaluatorActor, 
+                               Names )
+  {};
+
+  LinearRegression( void ) = delete;
+  LinearRegression( const LinearRegression & Other ) = delete;
+  virtual ~LinearRegression( void ) = default;
+
+};
+
+/*==============================================================================
+
+Support Vector Regression
+
+==============================================================================*/
+//
+// The Suppor Vector Regression (SVR) is a non-linear regression model that is
+// trained by the method of support vector machines. The SVR is a powerful model
+// that can capture complex relationships between the regressor values and the
+// performance indicator. The SVR is implemented as a derived class of the
+// regression function creator. The SVR is trained by the Sequential Minimal
+// Optimization (SMO) algorithm using a kernel method (projection).
+
+class SupportVectorRegression
+: virtual public Theron::Actor,
+  virtual public Theron::StandardFallbackHandler,
+  public RegressionFunctionCreator
+{
+  // --------------------------------------------------------------------------
+  // Training the support vector regression function
+  // --------------------------------------------------------------------------
+  //
+  // The only function that needs to be imlemented by the class is the training
+  // function. 
+
+protected:
+
+  virtual std::shared_ptr< const RegressionEvaluator::RegressionFunction > 
+  TrainRegressionFunction( const DenseMatrix & TheDesignMatrix, 
+                           const DenseVector & TheResponseVector ) override;
+
+  // It is also necessary to provide a regression function that can bootstrap
+  // the creation process since the regression function creator actor may be 
+  // created beore there is sufficient data to train the regression function.
+
+public:
+
+  virtual std::shared_ptr< RegressionEvaluator::RegressionFunction >
+  BootstrapRegressionFunction( void ) const override;
+
+  // --------------------------------------------------------------------------
+  // Constructor
+  // --------------------------------------------------------------------------
+
+public:
+
+  SupportVectorRegression( const std::string & PerformanceIndicatorName, 
+                           const Address TheTriggerActor, 
+                           const Address TheEvaluatorActor,
+                           const std::vector< std::string > & Names )
+  : Actor( PerformanceIndicatorName ),
+    StandardFallbackHandler( Actor::GetAddress().AsString() ),
+    RegressionFunctionCreator( Actor::GetAddress().AsString(), 
+                               TheTriggerActor, 
+                               TheEvaluatorActor, 
+                               Names )
+  {};
+
+  SupportVectorRegression( void ) = delete;
+  SupportVectorRegression( const SupportVectorRegression & Other ) = delete;
+  virtual ~SupportVectorRegression( void ) = default;
+};
+
+/*==============================================================================
+
+Projection Pursuit Regression
+
+==============================================================================*/
+//
+
+class ProjectionPursuitRegression
+: virtual public Theron::Actor,
+  virtual public Theron::StandardFallbackHandler,
+  public RegressionFunctionCreator
+{
+  // --------------------------------------------------------------------------
+  // Training the projection pursuit regression function
+  // --------------------------------------------------------------------------
+  //
+  // The only function that needs to be imlemented by the class is the training
+  // function.
+
+protected:
+
+  virtual std::shared_ptr< const RegressionEvaluator::RegressionFunction > 
+  TrainRegressionFunction( const DenseMatrix & TheDesignMatrix, 
+                           const DenseVector & TheResponseVector ) override;
+
+  // It is also necessary to provide a regression function that can bootstrap
+  // the creation process since the regression function creator actor may be 
+  // created beore there is sufficient data to train the regression function.
+
+public:
+
+  virtual std::shared_ptr< RegressionEvaluator::RegressionFunction >
+  BootstrapRegressionFunction( void ) const override;
+
+  // --------------------------------------------------------------------------
+  // Constructor
+  // --------------------------------------------------------------------------
+
+public:
+
+  ProjectionPursuitRegression( const std::string & PerformanceIndicatorName, 
+                               const Address TheTriggerActor, 
+                               const Address TheEvaluatorActor,
+                               const std::vector< std::string > & Names )
+  : Actor( PerformanceIndicatorName ),
+    StandardFallbackHandler( Actor::GetAddress().AsString() ),
+    RegressionFunctionCreator( Actor::GetAddress().AsString(), 
+                               TheTriggerActor, 
+                               TheEvaluatorActor, 
+                               Names )
+  {};
+
+  ProjectionPursuitRegression( void ) = delete;
+  ProjectionPursuitRegression( const ProjectionPursuitRegression & Other ) = delete;
+  virtual ~ProjectionPursuitRegression( void ) = default;
 };
 
 } // End name space NebulOuS

@@ -36,8 +36,17 @@ License: MPL2.0 (https://www.mozilla.org/en-US/MPL/2.0/)
 #include "Actor.hpp"                            // Actor base class
 #include "Utility/StandardFallbackHandler.hpp"  // Exception unhanded messages
 
+// NebulOuS specific headers
+
+#include "RegressionFunctionCreator.hpp"        // The regression functions
+
 namespace NebulOuS
 {
+// There is a orward declaration of te regression function creator base class 
+// so that the derived classes for the various regression algorithms can be
+// properly stored.
+
+
 /*==============================================================================
 
  Regression Evaluator Actor
@@ -91,13 +100,13 @@ private:
   {
     private:
 
-      std::unique_ptr< const RegressionFunction > ValueFunction;
-      std::unique_ptr< const Theron::Actor >      FunctionTrainer;
+      std::shared_ptr< const RegressionFunction >         ValueFunction;
+      std::unique_ptr< const RegressionFunctionCreator >  FunctionTrainer;
 
     public:
 
-      inline void UpdateFunction( std::unique_ptr< const RegressionFunction > NewFunction )
-      { ValueFunction = std::move( NewFunction ); }
+      inline void UpdateFunction( std::shared_ptr< const RegressionFunction > NewFunction )
+      { ValueFunction = NewFunction; }
 
       inline double Value( std::vector< double > & RegressorValues )
       { return ValueFunction->operator()( RegressorValues ); }
@@ -107,13 +116,21 @@ private:
 
       PerformanceIndicator( const std::string InidcatorName, 
                             Algorithm RegressionType,
-                            const std::vector< std::string > & RegressorNames );
+                            const std::vector< std::string > & RegressorNames,
+                            Address TheTriggerActor, Address TheEvaluatorActor );
   };
 
   // The performance indicators are stored in an unordered map where the name of the
   // indicator is the key.
 
   std::unordered_map< std::string, PerformanceIndicator > PerformanceIndicators;
+
+  // Since the regression function creators must interact with the trigger for 
+  // retraining events, it is necessary to store the address of the trigger 
+  // actor so that it can be passed to the regression function creator actors'
+  // constructors.
+
+  Address TheTriggerActor;
 
   // There is a function to check if a performance indicator is defined.
 
@@ -184,11 +201,11 @@ public:
     public:
 
       const std::string IndicatorName;
-      const std::unique_ptr< const RegressionFunction > TheFunction;
+      const std::shared_ptr< const RegressionFunction > TheFunction;
 
       NewRegressionFunction( const std::string Name, 
-                             std::unique_ptr< const RegressionFunction > Function )
-      : IndicatorName( Name ), TheFunction( std::move( Function ) ) {};
+                             std::shared_ptr< const RegressionFunction > Function )
+      : IndicatorName( Name ), TheFunction( Function ) {};
 
       ~NewRegressionFunction() = default;
   };
@@ -220,10 +237,10 @@ public:
   // The constructor will register the message handler for the new regression
   // function and the destructor will unregister the handler.
 
-  RegressionEvaluator( const std::string EvaluatorName )
+  RegressionEvaluator( const std::string EvaluatorName, Address TheTrigger )
   : Actor( EvaluatorName ),
     StandardFallbackHandler( Actor::GetAddress().AsString() ),
-    PerformanceIndicators(), RegressorNames()
+    PerformanceIndicators(), TheTriggerActor( TheTrigger ), RegressorNames()
   { 
     RegisterHandler( this, &RegressionEvaluator::StoreRegressionFunction ); 
     RegisterHandler( this, &RegressionEvaluator::StoreRegressorNames );
