@@ -86,7 +86,10 @@
 			"bitset": "cpp",
 			"regex": "cpp",
 			"syncstream": "cpp",
-			"expected": "cpp"
+			"expected": "cpp",
+			"*.ipp": "cpp",
+			"rope": "cpp",
+			"stacktrace": "cpp"
 		},
 		"gerrit.gitRepo": "/home/GHo/Documents/Code/NebulOuS/Solvers"
 	}
