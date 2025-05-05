@@ -35,4 +35,4 @@ fi
 
 echo "Starting SolverComponent: app id='${appid}' broker='${amqpbroker}:${amqpport}'" && sync
 
-exec ./SolverComponent --AMPLDir=/solver/AMPL --ModelDir=/tmp --Broker="$amqpbroker" --Port="$amqpport" --User="$amqpuser" -Pw="$amqppassword" --Endpoint="$appid"
+exec ./SolverComponent --AMPLDir=/solver/AMPL --ModelDir=/tmp --Broker="$amqpbroker" --Port="$amqpport" --User="$amqpuser" --password="$amqppassword" --Endpoint="$appid"
