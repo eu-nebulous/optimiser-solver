@@ -55,6 +55,7 @@ RUN dnf --assumeyes update && dnf --assumeyes install \
       json-c \
       json-glib \
       jsoncpp \
+      wget \
       && \
     dnf clean all
 
