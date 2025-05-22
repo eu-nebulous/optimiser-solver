@@ -62,7 +62,7 @@ RUN dnf --assumeyes update && dnf --assumeyes install \
 # Install Couenne
 
 RUN wget https://kojipkgs.fedoraproject.org//packages/coin-or-Couenne/0.5.8/19.fc41/x86_64/coin-or-Couenne-0.5.8-19.fc41.x86_64.rpm \
-    && dnf --assumeyes install coin-or-Couenne-0.5.8-19.fc41.x86_64 \
+    && dnf --assumeyes install coin-or-Couenne-0.5.8-19.fc41.x86_64.rpm \
     && rm coin-or-Couenne-0.5.8-19.fc41.x86_64.rpm
 
 COPY --from=builder /solver /solver
