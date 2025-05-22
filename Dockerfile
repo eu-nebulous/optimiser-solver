@@ -13,6 +13,8 @@ WORKDIR /solver
 # Development framework, dependencies
 RUN dnf --assumeyes update && dnf --assumeyes install \
       gcc-c++ \
+      binutils \
+      binutils-gold \
       make \
       git-core \
       boost-devel \
