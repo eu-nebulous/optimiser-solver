@@ -1,4 +1,4 @@
-FROM fedora:39 AS builder
+FROM fedora:42 AS builder
 
 # To build:
 # docker build -t nebulous/solver .
@@ -48,7 +48,7 @@ RUN make SolverComponent -e THERON=./Theron++ AMPL_INCLUDE=./AMPL/amplapi/includ
 
 # ============================================================
 
-FROM fedora:39
+FROM fedora:42
 WORKDIR /solver
 RUN dnf --assumeyes update && dnf --assumeyes install \
       boost \

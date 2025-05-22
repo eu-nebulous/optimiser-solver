@@ -4,7 +4,7 @@
             "name": "Linux",
             "includePath": [
                 "${workspaceFolder}/**",
-                "/usr/include/c++/14/",
+                "/usr/include/c++/15/",
                 "/usr/include/linux/",
                 "/usr/include/",
                 "/home/GHo/Documents/Code/NebulOuS/Solver/",
@@ -33,7 +33,7 @@
                     "/home/GHo/Documents/Code/CxxOpts/include/",
                     "/opt/AMPL/amplapi/include/",
                     "/usr/include/",
-                    "/usr/include/c++/14/",
+                    "/usr/include/c++/15/",
                     "/usr/include/linux/"
                 ],
                 "limitSymbolsToIncludedHeaders": false
