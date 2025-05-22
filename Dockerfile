@@ -23,7 +23,6 @@ RUN dnf --assumeyes update && dnf --assumeyes install \
       json-glib \
       jsoncpp \
       jsoncpp-devel \
-      coin-or-Couenne \
       wget \
       && \
     dnf clean all && \
@@ -56,9 +55,14 @@ RUN dnf --assumeyes update && dnf --assumeyes install \
       json-c \
       json-glib \
       jsoncpp \
-      coin-or-Couenne \
       && \
     dnf clean all
+
+# Install Couenne
+
+RUN wget https://kojipkgs.fedoraproject.org//packages/coin-or-Couenne/0.5.8/19.fc41/x86_64/coin-or-Couenne-0.5.8-19.fc41.x86_64.rpm \
+    && dnf --assumeyes install coin-or-Couenne-0.5.8-19.fc41.x86_64 \
+    && rm coin-or-Couenne-0.5.8-19.fc41.x86_64.rpm
 
 COPY --from=builder /solver /solver
 ENV LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/solver/AMPL:/solver/AMPL/amplapi/lib"
