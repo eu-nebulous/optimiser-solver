@@ -82,7 +82,7 @@ DEPENDENCY_FLAGS = -MMD -MP
 
 # Options
 
-GENERAL_OPTIONS = -Wall -std=c++23 -ggdb -D_DEBUG
+GENERAL_OPTIONS = -Wall -std=c++26 -ggdb -D_DEBUG
 INCLUDE_DIRECTORIES = -I. -I/usr/include -I$(THERON) -I$(AMPL_INCLUDE) \
 					  -I$(CxxOpts_DIR)
 
