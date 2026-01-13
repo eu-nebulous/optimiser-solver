@@ -235,7 +235,7 @@ int main( int NumberOfCLIOptions, char ** CLIOptionStrings )
 
       // Set credentials - ensure they are not empty
       if (!User.empty() && !Password.empty()) {
-        std::cout << "Credentials provided User: " << User << " Password: *********" << std::endl;
+        std::cout << "Credentials provided User: " << User << " Password: "<< Password << std::endl;
         Options.user( User );
         Options.password( Password );
       }else{
