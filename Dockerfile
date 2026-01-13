@@ -54,6 +54,8 @@ WORKDIR /solver
 RUN dnf --assumeyes update && dnf --assumeyes install \
       boost \
       qpid-proton-cpp \
+      cyrus-sasl \
+      cyrus-sasl-plain \
       json-c \
       json-glib \
       jsoncpp \
@@ -84,8 +86,8 @@ ENV LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/solver/AMPL:/solver/AMPL/amplapi/lib"
 # The docker can be started with explicit parameters, environment
 # variables or a mix of both.  Parameters override variables.
 #
-#     docker run -e APPLICATION_ID="my_app_id" nebulous/solver -b="https://amqp.example.com/" -p=s3kr1t
-#
+# docker run -e APPLICATION_ID="my_app_id" nebulous/solver -b="https://amqp.example.com/" -p=s3kr1t
+# docker run --network=host -e APPLICATION_ID="my_app_id" -e ACTIVEMQ_HOST="amqp://localhost" -e ACTIVEMQ_PORT=61616 -e ACTIVEMQ_USER=admin -e ACTIVEMQ_PASSWORD=test solver
 RUN chmod +x /solver/start-solver.sh
 
 ENTRYPOINT ["/solver/start-solver.sh"]
